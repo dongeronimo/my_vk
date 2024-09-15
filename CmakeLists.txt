@@ -56,12 +56,14 @@ target_link_libraries(assimp  zlibstatic)
 file(GLOB app_files "app/*.cpp" "app/*.h")
 file(GLOB utils_files "utils/*.h" "utils/*.cpp")
 file(GLOB ui_files "ui/*.cpp" "ui/*.h")
+file(GLOB vk_files "vk/*.cpp" "vk/*.h")
 file(GLOB shader_files "shaders/*.*")
 file(GLOB scripts_files "*.bat" "*.py")
 #####Group them in a nice organization#####
 source_group("app" FILES ${app_files})
 source_group("ui" FILES ${ui_files})
 source_group("utils" FILES ${utils_files})
+source_group("vk" FILES ${vk_files})
 source_group("shaders" FILES ${shader_files})
 source_group("scripts" FILES ${scripts_files})
 #####Define the targets#####
@@ -69,6 +71,7 @@ add_executable(my_vk_engine_demo
 	${app_files}
     ${ui_files}
     ${utils_files}
+    ${vk_files}
 	${shader_files}
 	${scripts_files}
 	)
@@ -88,7 +91,7 @@ target_compile_definitions(my_vk_engine_demo PRIVATE
     GLM_FORCE_DEPTH_ZERO_TO_ONE
 )
 target_compile_features(my_vk_engine_demo PRIVATE cxx_std_17)
-
+target_precompile_headers(my_vk_engine_demo PRIVATE <stdexcept> <cassert>)
 # Post-Build scripts for the shaders,
 set(SCRIPT_DIR "${CMAKE_SOURCE_DIR}")
 if(WIN32)

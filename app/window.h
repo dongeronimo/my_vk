@@ -22,7 +22,7 @@ namespace app {
         /// finished.
         /// </summary>
         void MainLoop();
-        const ui::MouseState& GetMouseState()const;
+      
 
     private:
         GLFWwindow* mWindow = nullptr;
