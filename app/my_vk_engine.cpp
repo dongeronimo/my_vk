@@ -3,6 +3,7 @@
 #include "vk/device.h"
 #include "vk/debug_utils.h"
 #include "vk/swap_chain.h"
+#include "vk/descriptor_service.h"
 int main(int argc, char** argv)
 {
     glfwInit();
@@ -14,6 +15,8 @@ int main(int argc, char** argv)
     vk::Device device(instance.GetPhysicalDevice(),instance.GetInstance(), instance.GetSurface(), vk::GetValidationLayerNames());
     //Create the swap chain
     vk::SwapChain swapChain;
+    //create the descriptor infrastructure: descriptorSetLayouts, DescriptorPools and DescriptorSets
+    vk::DescriptorService descriptorService;
     //begin the main loop - blocks here
     mainWindow.MainLoop();
     return 0;

@@ -59,11 +59,13 @@ file(GLOB ui_files "ui/*.cpp" "ui/*.h")
 file(GLOB vk_files "vk/*.cpp" "vk/*.h")
 file(GLOB shader_files "shaders/*.*")
 file(GLOB scripts_files "*.bat" "*.py")
+file(GLOB entities_files "entities/*.h" "entities/*.cpp")
 #####Group them in a nice organization#####
 source_group("app" FILES ${app_files})
 source_group("ui" FILES ${ui_files})
 source_group("utils" FILES ${utils_files})
 source_group("vk" FILES ${vk_files})
+source_group("entities" FILES ${entities_files})
 source_group("shaders" FILES ${shader_files})
 source_group("scripts" FILES ${scripts_files})
 #####Define the targets#####
@@ -72,6 +74,7 @@ add_executable(my_vk_engine_demo
     ${ui_files}
     ${utils_files}
     ${vk_files}
+    ${entities_files}
 	${shader_files}
 	${scripts_files}
 	)
