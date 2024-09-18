@@ -6,12 +6,16 @@
 #include "utils/concatenate.h"
 #include <entities/camera_uniform_buffer.h>
 #include <entities/model_matrix_uniform_buffer.h>
+#include "samplers_service.h"
+#include "image_service.h"
 const uint32_t MODEL_POOL_SIZE = 10000;
 const uint32_t SAMPLER_POOL_SIZE = 1000;
 
 namespace vk
 {
-    DescriptorService::DescriptorService()
+    DescriptorService::DescriptorService(SamplerService& samplerService,
+        ImageService& imageService)
+        :mSamplerService(samplerService)
     {
         mLayouts.insert({ utils::Hash(CAMERA_LAYOUT_NAME), CreateDescriptorSetLayoutForCamera() });
         mDescriptorPools.insert({ utils::Hash(CAMERA_LAYOUT_NAME), CreateDescriptorPoolForCamera() });
@@ -32,6 +36,18 @@ namespace vk
             vkDestroyDescriptorSetLayout(Device::gDevice->GetDevice(), kv.second, nullptr);
         }
         mLayouts.clear();
+        
+        for (auto& kv : mDescriptorPools) {
+            vkDestroyDescriptorPool(Device::gDevice->GetDevice(), kv.second, nullptr);
+        }
+        mDescriptorPools.clear();
+
+        for (auto& kv : mDescriptorSetBuffers) {
+            vkUnmapMemory(Device::gDevice->GetDevice(), kv.second.mMemory);
+            vkFreeMemory(Device::gDevice->GetDevice(), kv.second.mMemory, nullptr);
+            vkDestroyBuffer(Device::gDevice->GetDevice(), kv.second.mBuffer, nullptr);
+        }
+        mDescriptorSetBuffers.clear();
     }
     DescriptorService::DescriptorSetBuffer DescriptorService::CreateBuffer(
     uint32_t numElements, VkDeviceSize sizeOfEachElement, 

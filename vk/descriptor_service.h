@@ -4,6 +4,9 @@
 #include <vulkan/vulkan.h>
 namespace vk
 {
+    class SamplerService;
+    class ImageService;
+
     const uint32_t MAX_NUMBER_OF_OBJECTS = 10000 * MAX_FRAMES_IN_FLIGHT;
     const uint32_t MAX_NUMBER_OF_CAMERAS = MAX_FRAMES_IN_FLIGHT;
     const std::string CAMERA_LAYOUT_NAME = "CameraDataDescriptorSet";
@@ -15,10 +18,11 @@ namespace vk
     /// </summary>
     class DescriptorService {
     public:
-
-        DescriptorService();
+        DescriptorService(SamplerService& samplerService,
+            ImageService& imageService);
         ~DescriptorService();
     private:
+        SamplerService& mSamplerService;
         struct DescriptorSetBuffer {
             VkBuffer mBuffer;
             VkDeviceMemory mMemory;
@@ -58,6 +62,7 @@ namespace vk
         VkDescriptorSetLayout CreateDescriptorSetLayoutForObject();
         VkDescriptorPool CreateDescriptorPoolForModelMatrix();
         const std::vector<VkDescriptorSet> CreateDescriptorSetForModelMatrix();
+
         VkDescriptorSetLayout CreateDescriptorSetLayoutForSampler();
         VkDescriptorPool CreateDescriptorPoolForSampler();
     };
