@@ -38,7 +38,10 @@ namespace vk {
         uint32_t GetPresentationQueueFamily()const { return mPresentationQueueFamily; }
         VkQueue GetGraphicsQueue()const { return mGraphicsQueue; }
         VkQueue GetPresentationQueue()const { return mPresentationQueue; }
-
+        VkCommandBuffer CreateCommandBuffer(
+            const std::string& name);
+        void BeginRecordingCommands(VkCommandBuffer cmd);
+        void SubmitAndFinishCommands(VkCommandBuffer cmd);
     private:
         const VkPhysicalDevice mPhysicalDevice;
         const VkInstance mInstance;

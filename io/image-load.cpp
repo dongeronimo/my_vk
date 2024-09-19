@@ -24,7 +24,7 @@ void io::LoadImage(int& w,
 
 io::ImageData* io::LoadImage(const std::string& file)
 {
-    assert(file.size() == 0);
+    assert(file.size() != 0);
     ImageData* data = new ImageData;
     LoadImage(data->w, data->h, data->pixels, data->size, file);
     assert(data->size != 0);

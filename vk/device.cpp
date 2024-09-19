@@ -83,6 +83,43 @@ namespace vk {
         vkDestroyCommandPool(mDevice, mCommandPool, nullptr);
         vkDestroyDevice(mDevice, nullptr);
     }
+    VkCommandBuffer Device::CreateCommandBuffer(const std::string& name)
+    {
+        //a temporary command buffer for copy
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = mCommandPool;
+        allocInfo.commandBufferCount = 1;
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(mDevice, &allocInfo, &commandBuffer);
+        SET_NAME(commandBuffer, VK_OBJECT_TYPE_COMMAND_BUFFER, name.c_str());
+        return commandBuffer;
+    }
+    void Device::BeginRecordingCommands(VkCommandBuffer cmd)
+    {
+        //begin recording commands
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; //this command buffer will be used only once
+        vkBeginCommandBuffer(cmd, &beginInfo);
+    }
+    void Device::SubmitAndFinishCommands(VkCommandBuffer cmd)
+    {
+        //end the recording
+        vkEndCommandBuffer(cmd);
+        //submit the command
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &cmd;
+
+        vkQueueSubmit(mGraphicsQueue,
+            1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(mGraphicsQueue);//cpu waits until copy is done
+        //free the command buffer
+        vkFreeCommandBuffers(mDevice, mCommandPool, 1, &cmd);
+    }
     std::optional<uint32_t> Device::FindGraphicsQueueFamily(VkPhysicalDevice device)
     {
         uint32_t queueFamilyCount = 0;
