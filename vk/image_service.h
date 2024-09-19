@@ -4,6 +4,7 @@
 #include <string>
 #include <entities/image.h>
 #include <map>
+#include "utils/hash.h"
 namespace vk {
     class ImageService {
     public:
@@ -19,7 +20,10 @@ namespace vk {
             VkCommandPool commandPool, VkDevice device, VkQueue graphicsQueue);
         static void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
         ImageService(const std::vector<std::string>& assetNames);
-
+        ~ImageService();
+        const entities::Image& GetImage(const std::string& name) {
+            return mImageTable.at(utils::Hash(name));
+        }
     private:
         VkDeviceMemory mDeviceMemory = VK_NULL_HANDLE;
         std::map<size_t, entities::Image> mImageTable;

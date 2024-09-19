@@ -287,4 +287,12 @@ namespace vk
         }
         imageDataFromFiles.clear();
     }
+    ImageService::~ImageService()
+    {
+        vkFreeMemory(vk::Device::gDevice->GetDevice(), mDeviceMemory, nullptr);
+        for (auto& kv : mImageTable) {
+            vkDestroyImage(vk::Device::gDevice->GetDevice(), kv.second.mImage, nullptr);
+            vkDestroyImageView(vk::Device::gDevice->GetDevice(), kv.second.mImageView, nullptr);
+        }
+    }
 }

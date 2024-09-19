@@ -29,6 +29,40 @@ namespace vk
         mDescriptorPools.insert({ utils::Hash(SAMPLER_LAYOUT_NAME), CreateDescriptorPoolForSampler() });
         //TODO descriptorService: create descriptor sets for samplers. 
         // Remember that the descriptor set varies with the sampler and the imageview
+    
+        //create the descriptor sets for each image in the image service.
+        const VkSampler mySampler = samplerService.GetSampler(LINEAR_REPEAT_NORMALIZED_NONMIPMAP_SAMPLER);
+        const entities::Image& blackBrick = imageService.GetImage("blackBrick.png");
+        mDescriptorSets.insert({ 
+            utils::Hash("blackBrick.png"),
+            GenerateSamplerDescriptorSetsForTexture(
+                mDescriptorPools.at(utils::Hash(SAMPLER_LAYOUT_NAME)),
+                mLayouts.at(utils::Hash(SAMPLER_LAYOUT_NAME)),
+                blackBrick.mImageView,
+                mySampler,
+                "blackBrick.png")
+        });
+        const entities::Image& brick = imageService.GetImage("brick.png");
+        mDescriptorSets.insert({
+            utils::Hash("brick.png"),
+            GenerateSamplerDescriptorSetsForTexture(
+                mDescriptorPools.at(utils::Hash(SAMPLER_LAYOUT_NAME)),
+                mLayouts.at(utils::Hash(SAMPLER_LAYOUT_NAME)),
+                brick.mImageView,
+                mySampler,
+                "brick.png")
+            });
+
+        const entities::Image& floor01 = imageService.GetImage("floor01.jpg");
+        mDescriptorSets.insert({
+            utils::Hash("floor01.jpg"),
+            GenerateSamplerDescriptorSetsForTexture(
+                mDescriptorPools.at(utils::Hash(SAMPLER_LAYOUT_NAME)),
+                mLayouts.at(utils::Hash(SAMPLER_LAYOUT_NAME)),
+                brick.mImageView,
+                mySampler,
+                "floor01.jpg")
+                    });
     }
     DescriptorService::~DescriptorService()
     {
@@ -246,7 +280,7 @@ namespace vk
         //Build the descriptor sets
         VkDescriptorSetLayout objDescriptorSetLayout = mLayouts[utils::Hash(OBJECT_LAYOUT_NAME)];
         VkDescriptorPool cameraDescriptorPool = mDescriptorPools[utils::Hash(OBJECT_LAYOUT_NAME)];
-        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, objDescriptorSetLayout);
+        std::vector<VkDescriptorSetLayout> layouts(MAX_NUMBER_OF_OBJECTS, objDescriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = cameraDescriptorPool;
@@ -330,5 +364,38 @@ namespace vk
             SAMPLER_LAYOUT_NAME.c_str());
         return descriptorPool;
 
+    }
+    std::vector<VkDescriptorSet> DescriptorService::GenerateSamplerDescriptorSetsForTexture(VkDescriptorPool samplerDescriptorPool, VkDescriptorSetLayout samplerDescriptorSetLayout, VkImageView imageView, VkSampler sampler, const std::string& name)
+    {
+        //one layout for each frame in flight, create the vector filling with the layout that i alredy have
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT,
+            samplerDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = samplerDescriptorPool;
+        //one descriptor set for each frame in flight
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+        std::vector<VkDescriptorSet> descriptorSets(MAX_FRAMES_IN_FLIGHT);
+        if (vkAllocateDescriptorSets(vk::Device::gDevice->GetDevice(), &allocInfo,
+            descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets");
+        }
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = imageView;
+            imageInfo.sampler = sampler;
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = descriptorSets[i];
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pImageInfo = &imageInfo;
+            vkUpdateDescriptorSets(Device::gDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
+        }
+        return descriptorSets;
     }
 }

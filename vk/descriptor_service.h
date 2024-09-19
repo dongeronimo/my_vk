@@ -65,5 +65,11 @@ namespace vk
 
         VkDescriptorSetLayout CreateDescriptorSetLayoutForSampler();
         VkDescriptorPool CreateDescriptorPoolForSampler();
+
+        std::vector<VkDescriptorSet> GenerateSamplerDescriptorSetsForTexture(VkDescriptorPool samplerDescriptorPool,
+            VkDescriptorSetLayout samplerDescriptorSetLayout,
+            VkImageView imageView,
+            VkSampler sampler,
+            const std::string& name);
     };
 }
