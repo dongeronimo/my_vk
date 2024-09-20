@@ -10,6 +10,7 @@
 #include "utils/vk_utils.h"
 #include "vk/framebuffer.h"
 #include "vk/mesh_service.h"
+#include "vk/synchronization_service.h"
 int main(int argc, char** argv)
 {
     glfwInit();
@@ -38,6 +39,7 @@ int main(int argc, char** argv)
     vk::MeshService meshService({ "monkey.glb" });
     //create the pipelines
     //create the synchronization objects
+    vk::SyncronizationService syncService;
     //begin the main loop - blocks here
     mainWindow.MainLoop();
     return 0;
