@@ -5,4 +5,8 @@ namespace utils {
         VkMemoryPropertyFlags properties);
 
     VkFormat FindDepthFormat(VkPhysicalDevice physicalDevice);
+
+    void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags properties, VkBuffer& buffer,
+        VkDeviceMemory& bufferMemory);
 }

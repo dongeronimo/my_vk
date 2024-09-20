@@ -42,6 +42,8 @@ namespace vk {
             const std::string& name);
         void BeginRecordingCommands(VkCommandBuffer cmd);
         void SubmitAndFinishCommands(VkCommandBuffer cmd);
+        void CopyBuffer(VkDeviceSize srcOffset, VkDeviceSize dstOffset,
+            VkDeviceSize size, VkCommandBuffer cmd, VkBuffer src, VkBuffer dst);
     private:
         const VkPhysicalDevice mPhysicalDevice;
         const VkInstance mInstance;

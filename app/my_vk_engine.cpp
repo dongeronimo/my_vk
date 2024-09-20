@@ -9,6 +9,7 @@
 #include "vk/render_pass.h"
 #include "utils/vk_utils.h"
 #include "vk/framebuffer.h"
+#include "vk/mesh_service.h"
 int main(int argc, char** argv)
 {
     glfwInit();
@@ -34,6 +35,7 @@ int main(int argc, char** argv)
     vk::DescriptorService descriptorService(samplersService,
         imageService);
     //load meshes
+    vk::MeshService meshService({ "monkey.glb" });
     //create the pipelines
     //create the synchronization objects
     //begin the main loop - blocks here

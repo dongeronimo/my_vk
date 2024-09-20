@@ -120,6 +120,15 @@ namespace vk {
         //free the command buffer
         vkFreeCommandBuffers(mDevice, mCommandPool, 1, &cmd);
     }
+    void Device::CopyBuffer(VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkDeviceSize size, VkCommandBuffer cmd, VkBuffer src, VkBuffer dst)
+    {
+        //copy command
+        VkBufferCopy copyRegion{};
+        copyRegion.srcOffset = srcOffset; // Optional
+        copyRegion.dstOffset = dstOffset; // Optional
+        copyRegion.size = size;
+        vkCmdCopyBuffer(cmd, src, dst, 1, &copyRegion);
+    }
     std::optional<uint32_t> Device::FindGraphicsQueueFamily(VkPhysicalDevice device)
     {
         uint32_t queueFamilyCount = 0;
