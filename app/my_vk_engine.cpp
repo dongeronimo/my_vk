@@ -6,6 +6,9 @@
 #include "vk/descriptor_service.h"
 #include "vk/samplers_service.h"
 #include "vk/image_service.h"
+#include "vk/render_pass.h"
+#include "utils/vk_utils.h"
+#include "vk/framebuffer.h"
 int main(int argc, char** argv)
 {
     glfwInit();
@@ -17,6 +20,12 @@ int main(int argc, char** argv)
     vk::Device device(instance.GetPhysicalDevice(),instance.GetInstance(), instance.GetSurface(), vk::GetValidationLayerNames());
     //Create the swap chain
     vk::SwapChain swapChain;
+    //create the render pass for onscreen rendering
+    //TODO depth buffer - remeber that we have a version that uses depth buffer.
+    vk::RenderPass mainRenderPass( swapChain.GetFormat(), "mainRenderPass");
+    //create the framebuffer for onscreen rendering
+    //TODO depth buffer - no depth buffer, need to add one
+    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), swapChain.GetExtent(), mainRenderPass, "mainFramebuffer");
     //create the samplers
     vk::SamplerService samplersService;
     //create the images
@@ -24,6 +33,9 @@ int main(int argc, char** argv)
     //create the descriptor infrastructure: descriptorSetLayouts, DescriptorPools and DescriptorSets
     vk::DescriptorService descriptorService(samplersService,
         imageService);
+    //load meshes
+    //create the pipelines
+    //create the synchronization objects
     //begin the main loop - blocks here
     mainWindow.MainLoop();
     return 0;
