@@ -13,7 +13,34 @@ uint32_t meshCounter = 0;
 uintptr_t gMemoryCursor = 0;
 
 namespace entities {
-    
+    std::vector<VkVertexInputAttributeDescription> Mesh::AttributeDescription()
+    {
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
+        //inPosition
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(entities::Vertex, pos);
+        //inUV0
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(entities::Vertex, uv0);
+        //inColor
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(entities::Vertex, normal);
+        return attributeDescriptions;
+    }
+    VkVertexInputBindingDescription Mesh::BindingDescription()
+    {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(entities::Vertex);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return bindingDescription;
+    }
     Mesh::Mesh(entities::MeshData& meshData):mName(meshData.name)
     {
         CtorStartAssertions();

@@ -11,6 +11,7 @@
 #include "vk/framebuffer.h"
 #include "vk/mesh_service.h"
 #include "vk/synchronization_service.h"
+#include "entities/pipeline.h"
 int main(int argc, char** argv)
 {
     glfwInit();
@@ -37,9 +38,25 @@ int main(int argc, char** argv)
         imageService);
     //load meshes
     vk::MeshService meshService({ "monkey.glb" });
-    //create the pipelines
+    //TODO:create the pipelines
+    entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline"))->
+        SetRenderPass(&mainRenderPass)->
+        SetShaderModules(
+            entities::LoadShaderModule(device.GetDevice(), "demo.vert.spv"),
+            entities::LoadShaderModule(device.GetDevice(), "demo.frag.spv")
+        )->
+        SetDescriptorSetLayouts({
+            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
+            descriptorService.DescriptorSetLayout(vk::OBJECT_LAYOUT_NAME)})->
+        SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
+        SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
+        SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
+        SetColorBlending(entities::GetNoColorBlend())->
+        Build();
     //create the synchronization objects
     vk::SyncronizationService syncService;
+    //TODO: Create a game object
+    //TODO: Define the camera
     //begin the main loop - blocks here
     mainWindow.MainLoop();
     return 0;

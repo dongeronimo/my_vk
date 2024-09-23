@@ -15,6 +15,13 @@ namespace entities {
     };
     class Mesh {
     public:
+        /// <summary>
+        /// To make it simple, all meshes will have the same attribute description.
+        /// That's used by the pipelines to define how the vertex data is defined
+        /// </summary>
+        /// <returns></returns>
+        static std::vector<VkVertexInputAttributeDescription> AttributeDescription();
+        static VkVertexInputBindingDescription BindingDescription();
         Mesh(entities::MeshData& meshData);
         ~Mesh();
         const std::string mName;

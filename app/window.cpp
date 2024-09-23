@@ -29,7 +29,7 @@ namespace app {
         while (!glfwWindowShouldClose(mWindow))
         {
             glfwPollEvents();
-            //TODO: launch load assets worker thread
+            //TODO: draw the game objects
 
         }
     }

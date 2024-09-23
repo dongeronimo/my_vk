@@ -83,6 +83,12 @@ namespace vk
         }
         mDescriptorSetBuffers.clear();
     }
+    VkDescriptorSetLayout DescriptorService::DescriptorSetLayout(const std::string& name) const
+    {
+        auto hash = utils::Hash(name);
+        assert(mLayouts.count(hash) > 0);
+        return mLayouts.at(hash);
+    }
     DescriptorService::DescriptorSetBuffer DescriptorService::CreateBuffer(
     uint32_t numElements, VkDeviceSize sizeOfEachElement, 
         VkMemoryPropertyFlags memoryType, VkBufferUsageFlags usage)

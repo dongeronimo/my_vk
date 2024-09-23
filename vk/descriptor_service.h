@@ -21,6 +21,7 @@ namespace vk
         DescriptorService(SamplerService& samplerService,
             ImageService& imageService);
         ~DescriptorService();
+        VkDescriptorSetLayout DescriptorSetLayout(const std::string& name)const;
     private:
         SamplerService& mSamplerService;
         struct DescriptorSetBuffer {
