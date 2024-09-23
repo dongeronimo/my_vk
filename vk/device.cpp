@@ -4,6 +4,7 @@
 #include <vector>
 #include "vk/debug_utils.h"
 #include <stdexcept>
+
 namespace vk {
     Device* Device::gDevice;
 

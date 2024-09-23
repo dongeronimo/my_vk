@@ -89,6 +89,35 @@ namespace vk
         assert(mLayouts.count(hash) > 0);
         return mLayouts.at(hash);
     }
+    std::vector<VkDescriptorSet> DescriptorService::DescriptorSet(const std::string& name,
+        uint32_t idx) const
+    {
+        //Get the descriptor set bucket that i want
+        auto hash = utils::Hash(name);
+        assert(mDescriptorSets.count(hash) > 0);
+        auto allDS = mDescriptorSets.at(hash);
+        assert(idx * MAX_FRAMES_IN_FLIGHT < allDS.size());
+        //now that only the descriptor set that i want
+        std::vector<VkDescriptorSet> slice(MAX_FRAMES_IN_FLIGHT);
+        for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            slice[i] = allDS[idx * MAX_FRAMES_IN_FLIGHT + i];
+        }
+        return slice;
+    }
+    std::vector<uintptr_t> DescriptorService::DescriptorSetsBuffersOffsets(const std::string& name, uint32_t idx) const
+    {
+        //Get the descriptor set bucket that i want
+        auto hash = utils::Hash(name);
+        assert(mDescriptorSetsBuffersOffsets.count(hash) > 0);
+        auto allOffsets = mDescriptorSetsBuffersOffsets.at(hash);
+        assert(idx * MAX_FRAMES_IN_FLIGHT < allOffsets.size());
+        //now that only the descriptor set that i want
+        std::vector<uintptr_t> slice(MAX_FRAMES_IN_FLIGHT);
+        for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            slice[i] = allOffsets[idx * MAX_FRAMES_IN_FLIGHT + i];
+        }
+        return slice;
+    }
     DescriptorService::DescriptorSetBuffer DescriptorService::CreateBuffer(
     uint32_t numElements, VkDeviceSize sizeOfEachElement, 
         VkMemoryPropertyFlags memoryType, VkBufferUsageFlags usage)

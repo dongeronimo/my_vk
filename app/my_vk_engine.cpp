@@ -12,6 +12,12 @@
 #include "vk/mesh_service.h"
 #include "vk/synchronization_service.h"
 #include "entities/pipeline.h"
+#include "entities/game_object.h"
+#include <chrono>
+#include "app/timer.h"
+#include <entities/camera_uniform_buffer.h>
+entities::GameObect* gFoo = nullptr;
+
 int main(int argc, char** argv)
 {
     glfwInit();
@@ -38,7 +44,7 @@ int main(int argc, char** argv)
         imageService);
     //load meshes
     vk::MeshService meshService({ "monkey.glb" });
-    //TODO:create the pipelines
+    //create the pipelines
     entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline"))->
         SetRenderPass(&mainRenderPass)->
         SetShaderModules(
@@ -55,8 +61,24 @@ int main(int argc, char** argv)
         Build();
     //create the synchronization objects
     vk::SyncronizationService syncService;
-    //TODO: Create a game object
-    //TODO: Define the camera
+    //Create a game object
+    gFoo = new entities::GameObect("foo", descriptorService, meshService.GetMesh("monkey.glb"));
+    gFoo->SetPosition({ 0,0,0 });
+    gFoo->SetOrientation(glm::quat());
+    //Define the camera
+    entities::CameraUniformBuffer cameraBuffer;
+    cameraBuffer.cameraPos = glm::vec3(5.0f, 5.0f, 5.0f);
+    cameraBuffer.view = glm::lookAt(cameraBuffer.cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    //some perspective projection
+    cameraBuffer.proj = glm::perspective(glm::radians(45.0f),
+        swapChain.GetExtent().width / (float)swapChain.GetExtent().height, 0.1f, 100.0f);
+    //GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
+    cameraBuffer.proj[1][1] *= -1;
+    //define the main loop callback
+    app::Timer timer;
+    mainWindow.OnRender = [&timer](app::Window* w) {
+        timer.Advance();//advance the clock
+    };
     //begin the main loop - blocks here
     mainWindow.MainLoop();
     return 0;

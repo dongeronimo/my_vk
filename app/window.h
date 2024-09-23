@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <GLFW/glfw3.h>
 #include "ui/mouse_event.h"
 
@@ -22,7 +23,7 @@ namespace app {
         /// finished.
         /// </summary>
         void MainLoop();
-      
+        std::function<void(Window*)> OnRender;
 
     private:
         GLFWwindow* mWindow = nullptr;

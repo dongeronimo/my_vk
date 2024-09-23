@@ -29,8 +29,7 @@ namespace app {
         while (!glfwWindowShouldClose(mWindow))
         {
             glfwPollEvents();
-            //TODO: draw the game objects
-
+            OnRender(this);
         }
     }
 

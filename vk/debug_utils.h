@@ -52,5 +52,7 @@ namespace vk {
     void SetMark(std::array<float, 4> color,
         std::string name,
         VkCommandBuffer cmd);
+
+    void EndMark(VkCommandBuffer cmd);
 }
 #define SET_NAME(obj, type, name) vk::ObjectNamer::Instance().SetName(TO_HANDLE(obj), type, name);

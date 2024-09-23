@@ -1,6 +1,7 @@
 #include "vk/debug_utils.h"
 #include <stdexcept>
 #include <cassert>
+#include "device.h"
 VkDevice vk::ObjectNamer::gDevice;
 namespace vk {
 #ifdef NDEBUG
@@ -123,6 +124,34 @@ namespace vk {
         auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
         if (func != nullptr) {
             func(instance, debugMessenger, nullptr);
+        }
+    }
+    PFN_vkCmdDebugMarkerBeginEXT __vkCmdDebugMarkerBeginEXT;
+    PFN_vkCmdDebugMarkerEndEXT __vkCmdDebugMarkerEndEXT;
+    PFN_vkCmdDebugMarkerInsertEXT __vkCmdDebugMarkerInsertEXT;
+    void SetMark(std::array<float, 4> color, std::string name, VkCommandBuffer cmd)
+    {
+        if (__vkCmdDebugMarkerBeginEXT == nullptr) {
+            __vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetDeviceProcAddr(
+                vk::Device::gDevice->GetDevice(), "vkCmdDebugMarkerBeginEXT");
+            __vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetDeviceProcAddr(vk::Device::gDevice->GetDevice(), "vkCmdDebugMarkerEndEXT");
+
+        }
+        VkDebugMarkerMarkerInfoEXT markerInfo = {};
+        markerInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+        markerInfo.pNext = nullptr;
+        markerInfo.pMarkerName = name.c_str();
+        markerInfo.color[0] = color[0];              // Optional RGBA color
+        markerInfo.color[1] = color[1];
+        markerInfo.color[2] = color[2];
+        markerInfo.color[3] = color[3];
+        __vkCmdDebugMarkerBeginEXT(cmd, &markerInfo);
+    }
+
+    void EndMark(VkCommandBuffer cmd)
+    {
+        if (__vkCmdDebugMarkerEndEXT == VK_NULL_HANDLE) {
+            __vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetDeviceProcAddr(vk::Device::gDevice->GetDevice(), "vkCmdDebugMarkerEndEXT");
         }
     }
 

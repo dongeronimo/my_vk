@@ -63,9 +63,7 @@ namespace vk
         //in it.
         VkMemoryRequirements memRequirements;
         vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-        //TODO: Use VulkanMemoryAllocator instead of allocating memory on my own because gpus have a limited number of simultaneous memory allocations.
-        //In a scene with a lot of objects this limit is reached very fast
-        //https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;

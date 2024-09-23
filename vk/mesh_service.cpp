@@ -17,6 +17,11 @@ namespace vk {
             }
         }
     }
+    entities::Mesh* MeshService::GetMesh(const std::string& n) const
+    {
+        auto hash = utils::Hash(n);
+        return mMeshes.at(hash);
+    }
     MeshService::~MeshService()
     {
         for (auto& kv : mMeshes) {

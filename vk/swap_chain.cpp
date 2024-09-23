@@ -48,8 +48,18 @@ VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>
 
 VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes)
 {
-    //TODO swapchain: prefer MAILBOX but if no MAILBOX use FIFO
-    return VK_PRESENT_MODE_FIFO_KHR;
+    VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR; // Default to FIFO
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(vk::Instance::gInstance->GetPhysicalDevice(), vk::Instance::gInstance->GetSurface(), &presentModeCount, nullptr);
+    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(vk::Instance::gInstance->GetPhysicalDevice(), vk::Instance::gInstance->GetSurface(), &presentModeCount, presentModes.data());
+    for (const auto& availablePresentMode : presentModes) {
+        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            break;
+        }
+    }
+    return presentMode;
 }
 namespace vk {
     SwapChain::SwapChain()
