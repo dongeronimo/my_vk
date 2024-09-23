@@ -13,6 +13,8 @@ namespace entities
     VkPipelineRasterizationStateCreateInfo GetBackfaceCullClockwiseRasterizationInfo();
     VkPipelineDepthStencilStateCreateInfo GetDefaultDepthStencil();
     VkPipelineColorBlendStateCreateInfo GetNoColorBlend();
+    VkViewport GetViewportForSize(uint32_t w, uint32_t h);
+    VkRect2D GetScissor(uint32_t w, uint32_t h);
     /// <summary>
     /// Load a shader from the compiled .spv to a shader module
     /// </summary>
@@ -67,6 +69,7 @@ namespace entities
         PipelineBuilder* SetDepthStencilStateInfo(VkPipelineDepthStencilStateCreateInfo info);
         PipelineBuilder* SetRasterizerStateInfo(VkPipelineRasterizationStateCreateInfo info);
         PipelineBuilder* SetColorBlending(VkPipelineColorBlendStateCreateInfo info);
+        PipelineBuilder* SetViewport(VkViewport vp, VkRect2D scissor);
         Pipeline* Build();
     private:
         std::vector<VkPushConstantRange> mPushConstantRanges{};
@@ -83,6 +86,8 @@ namespace entities
         ~Pipeline();
         friend class PipelineBuilder;
     private:
+        VkRect2D mScissor;
+        VkViewport mViewport;
         VkPipelineColorBlendStateCreateInfo mColorBlending{};
         VkPipelineDepthStencilStateCreateInfo mDepthStencilInfo{};
         VkPipelineRasterizationStateCreateInfo mRasterizationStateInfo{};

@@ -119,6 +119,13 @@ namespace entities
         return this;
     }
 
+    PipelineBuilder* PipelineBuilder::SetViewport(VkViewport vp, VkRect2D scissor)
+    {
+        mPipeline->mViewport = vp;
+        mPipeline->mScissor = scissor;
+        return this;
+    }
+
     Pipeline* PipelineBuilder::Build()
     {
         //TODO pipeline: set the viewport and stencil
@@ -131,6 +138,8 @@ namespace entities
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
         viewportState.viewportCount = 1;
         viewportState.scissorCount = 1;
+        viewportState.pViewports = &mPipeline->mViewport;
+        viewportState.pScissors = &mPipeline->mScissor;
         //input description: the geometry input will be triangles
         VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -277,6 +286,29 @@ namespace entities
         colorBlending.attachmentCount = 1;
         colorBlending.pAttachments = &colorBlendAttachment;
         return colorBlending;
+    }
+
+    VkViewport GetViewportForSize(uint32_t w, uint32_t h)
+    {
+        // Define the viewport and scissor
+        VkViewport viewport = {};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(w);
+        viewport.height = static_cast<float>(h);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        return viewport;
+
+    }
+
+    VkRect2D GetScissor(uint32_t w, uint32_t h)
+    {
+        VkExtent2D sz{ w,h };
+        VkRect2D scissor = {};
+        scissor.offset = { 0, 0 };
+        scissor.extent = sz;
+        return scissor;
     }
 
 }
