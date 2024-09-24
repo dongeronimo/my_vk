@@ -1,6 +1,8 @@
 #include "game_object.h"
 #include <map>
 #include <vk\descriptor_service.h>
+#include <utils/hash.h>
+#include <vk/debug_utils.h>
 /// <summary>
 /// List of available id for game objects. Its important because there's a limited number of possible
 /// game objects, limited by the number of descriptor sets in the pool and memory allocated on the 
@@ -33,11 +35,21 @@ uint32_t GetNextGameObjectId() {
 }
 namespace entities
 {
-    GameObect::GameObect(const std::string& name, vk::DescriptorService& descriptorService, entities::Mesh* mesh)
-        :mName(name), mId(GetNextGameObjectId()), mDescriptorService(descriptorService), mMesh(mesh)
+    GameObect::GameObect(const std::string& name, vk::DescriptorService& descriptorService, 
+        const std::string& pipeline,
+        entities::Mesh* mesh)
+        :mName(name), mId(GetNextGameObjectId()), mDescriptorService(descriptorService), mMesh(mesh),
+        mPipelineName(pipeline), mPipelineHash(utils::Hash(pipeline))
     {
         //Get the descriptor set for model matrix
         mDescriptorSets = mDescriptorService.DescriptorSet(vk::OBJECT_LAYOUT_NAME, mId);
-        mOffsets = mDescriptorService.DescriptorSetsBuffersOffsets(vk::OBJECT_LAYOUT_NAME, mId);
+        mOffsets = mDescriptorService.DescriptorSetsBuffersAddrs(vk::OBJECT_LAYOUT_NAME, mId);
+    }
+    void GameObect::Draw(VkCommandBuffer cmdBuffer)
+    {
+        //Create the debug mark
+        vk::SetMark({ 1.0f, 0.8f, 1.0f, 1.0f }, mName, cmdBuffer);
+        //Clear the debug mark
+        vk::EndMark(cmdBuffer);
     }
 }

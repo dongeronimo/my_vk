@@ -103,23 +103,25 @@ namespace vk
         }
         return slice;
     }
-    std::vector<uintptr_t> DescriptorService::DescriptorSetsBuffersOffsets(const std::string& name, uint32_t idx) const
+    std::vector<uintptr_t> DescriptorService::DescriptorSetsBuffersAddrs(const std::string& name, uint32_t idx) const
     {
         //Get the descriptor set bucket that i want
         auto hash = utils::Hash(name);
         assert(mDescriptorSetsBuffersOffsets.count(hash) > 0);
         auto allOffsets = mDescriptorSetsBuffersOffsets.at(hash);
         assert(idx * MAX_FRAMES_IN_FLIGHT < allOffsets.size());
+     
+        uintptr_t baseAddress = mBaseAddesses.at(hash);
         //now that only the descriptor set that i want
         std::vector<uintptr_t> slice(MAX_FRAMES_IN_FLIGHT);
         for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            slice[i] = allOffsets[idx * MAX_FRAMES_IN_FLIGHT + i];
+            slice[i] = allOffsets[idx * MAX_FRAMES_IN_FLIGHT + i] + baseAddress;
         }
         return slice;
     }
     DescriptorService::DescriptorSetBuffer DescriptorService::CreateBuffer(
     uint32_t numElements, VkDeviceSize sizeOfEachElement, 
-        VkMemoryPropertyFlags memoryType, VkBufferUsageFlags usage)
+        VkMemoryPropertyFlags memoryType, VkBufferUsageFlags usage, uintptr_t& baseAddress)
     {
         DescriptorService::DescriptorSetBuffer bufferData;
         /////1) create the big buffer
@@ -151,6 +153,7 @@ namespace vk
         vkMapMemory(Device::gDevice->GetDevice(), bigBufferMemory, 0,
             sizeOfEachElement * numElements, 0, &baseAddr);
         bufferData.mBasePointer = reinterpret_cast<std::uintptr_t>(baseAddr);
+        baseAddress = reinterpret_cast<uintptr_t>(baseAddr);
         return bufferData;
     }
     VkDescriptorSetLayout DescriptorService::CreateDescriptorSetLayoutForCamera()
@@ -201,10 +204,12 @@ namespace vk
     {
         //alloc the buffers for the sets
         VkDeviceSize bufferSize = sizeof(entities::CameraUniformBuffer);
+        uintptr_t baseAddress;
         DescriptorSetBuffer cameraBuffer = CreateBuffer(MAX_NUMBER_OF_CAMERAS, 
             sizeof(entities::CameraUniformBuffer),
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, baseAddress);
+        mBaseAddesses.insert({ utils::Hash(CAMERA_LAYOUT_NAME), baseAddress });
         mDescriptorSetBuffers.insert({ utils::Hash(CAMERA_LAYOUT_NAME), cameraBuffer });
         auto bufferName = Concatenate(CAMERA_LAYOUT_NAME, "Buffer");
         //name the buffer objects
@@ -301,11 +306,13 @@ namespace vk
     {
         //alloc the buffers for the sets
         VkDeviceSize bufferSize = sizeof(entities::ModelMatrixUniformBuffer);
+        uintptr_t baseAddress;
         DescriptorSetBuffer objBuffer = CreateBuffer(MAX_NUMBER_OF_OBJECTS,
             sizeof(entities::ModelMatrixUniformBuffer),
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, baseAddress);
         mDescriptorSetBuffers.insert({ utils::Hash(OBJECT_LAYOUT_NAME), objBuffer });
+        mBaseAddesses.insert({ utils::Hash(OBJECT_LAYOUT_NAME), baseAddress });
         auto bufferName = Concatenate(OBJECT_LAYOUT_NAME, "Buffer");
         //name the buffer objects
         SET_NAME(objBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, bufferName.c_str());

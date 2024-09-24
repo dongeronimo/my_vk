@@ -24,7 +24,7 @@ namespace vk
         VkDescriptorSetLayout DescriptorSetLayout(const std::string& name)const;
         std::vector<VkDescriptorSet> DescriptorSet(const std::string& name,
             uint32_t idx)const;
-        std::vector<uintptr_t> DescriptorSetsBuffersOffsets(const std::string& name,
+        std::vector<uintptr_t> DescriptorSetsBuffersAddrs(const std::string& name,
             uint32_t idx)const;
     private:
         SamplerService& mSamplerService;
@@ -41,7 +41,7 @@ namespace vk
         /// <param name="usage"></param>
         /// <returns></returns>
         static DescriptorSetBuffer CreateBuffer(
-            uint32_t numElements, VkDeviceSize sizeOfEachElement, VkMemoryPropertyFlags memoryType, VkBufferUsageFlags usage);
+            uint32_t numElements, VkDeviceSize sizeOfEachElement, VkMemoryPropertyFlags memoryType, VkBufferUsageFlags usage, uintptr_t& baseAddress);
         /// <summary>
         /// Holds the descriptor set layouts;
         /// </summary>
@@ -59,6 +59,7 @@ namespace vk
         /// </summary>
         std::map<size_t, DescriptorSetBuffer> mDescriptorSetBuffers;
         std::map<size_t, const std::vector<std::uintptr_t>> mDescriptorSetsBuffersOffsets;
+        std::map<size_t, const uintptr_t> mBaseAddesses;
 
         VkDescriptorSetLayout CreateDescriptorSetLayoutForCamera();
         VkDescriptorPool CreateDescriptorPoolForCamera();

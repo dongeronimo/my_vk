@@ -54,6 +54,12 @@ namespace entities
         vkDestroyShaderModule(d, mVertexShader, nullptr);
     }
 
+    void Pipeline::Bind(VkCommandBuffer buffer)
+    {
+        vkCmdBindPipeline(buffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+    }
+
     void Pipeline::SetRenderPass(vk::RenderPass* rp)
     {
         this->mRenderPass = rp;

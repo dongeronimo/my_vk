@@ -84,6 +84,7 @@ namespace entities
     public:
         Pipeline();
         ~Pipeline();
+        void Bind(VkCommandBuffer buffer);
         friend class PipelineBuilder;
     private:
         VkRect2D mScissor;

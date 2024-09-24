@@ -10,11 +10,13 @@ namespace vk {
 }
 namespace entities {
     class Mesh;
+    class Pipeline;
     class GameObect {
     public:
         GameObect(const std::string& name, 
             vk::DescriptorService& descriptorService,
-            entities::Mesh* mesh);
+            const std::string& pipeline,  //TODO staticMeshRenderer: Game Object should not have the mesh
+            entities::Mesh* mesh);//TODO staticMeshRenderer: Game Object should not have the mesh
         void SetPosition(glm::vec3& pos) {
             mPosition = pos;
         }
@@ -25,6 +27,9 @@ namespace entities {
         glm::quat GetOrientation()const { return mOrientation; }
         const std::string mName;
         const uint32_t mId;
+        const size_t mPipelineHash;
+        const std::string mPipelineName;
+        void Draw(VkCommandBuffer cmdBuffer);//TODO staticMeshRenderer: this belongs to StaticMeshRenderer
     private:
         entities::Mesh* mMesh;
         vk::DescriptorService& mDescriptorService;
