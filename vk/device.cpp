@@ -4,6 +4,7 @@
 #include <vector>
 #include "vk/debug_utils.h"
 #include <stdexcept>
+#include <utils/concatenate.h>
 
 namespace vk {
     Device* Device::gDevice;
@@ -63,10 +64,7 @@ namespace vk {
         vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &mDevice);
         vkGetDeviceQueue(mDevice, mGraphicsQueueFamily, 0, &mGraphicsQueue);
         vkGetDeviceQueue(mDevice, mPresentationQueueFamily, 0, &mPresentationQueue);
-        /*vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetDeviceProcAddr(mDevice, "vkCmdDebugMarkerBeginEXT");
-        vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetDeviceProcAddr(mDevice, "vkCmdDebugMarkerEndEXT");
-        vkCmdDebugMarkerInsertEXT = (PFN_vkCmdDebugMarkerInsertEXT)vkGetDeviceProcAddr(mDevice, "vkCmdDebugMarkerInsertEXT");
-        *///initializes the object namer
+        ///initializes the object namer
         vk::ObjectNamer::Instance().Init(mDevice);
         //creates the command pool
         VkCommandPoolCreateInfo commandPoolCreateInfo{};
@@ -96,6 +94,27 @@ namespace vk {
         vkAllocateCommandBuffers(mDevice, &allocInfo, &commandBuffer);
         SET_NAME(commandBuffer, VK_OBJECT_TYPE_COMMAND_BUFFER, name.c_str());
         return commandBuffer;
+    }
+    std::vector<VkCommandBuffer> Device::CreateCommandBuffer(const std::string& name, uint32_t count)
+    {
+        std::vector<VkCommandBuffer> commandBuffers(MAX_FRAMES_IN_FLIGHT);
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = vk::Device::gDevice->GetCommandPool();
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
+        if (vkAllocateCommandBuffers(vk::Device::gDevice->GetDevice(), &allocInfo,
+            commandBuffers.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate command buffers!");
+        }
+        int i = 0;
+        for (VkCommandBuffer& x : commandBuffers) {
+            auto str = Concatenate("renderCommandBuffer", i);
+            SET_NAME(x, VK_OBJECT_TYPE_COMMAND_BUFFER, str.c_str());
+            i++;
+        }
+        return commandBuffers;
     }
     void Device::BeginRecordingCommands(VkCommandBuffer cmd)
     {

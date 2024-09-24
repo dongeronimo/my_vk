@@ -27,7 +27,6 @@ namespace vk
         
         mLayouts.insert({ utils::Hash(SAMPLER_LAYOUT_NAME), CreateDescriptorSetLayoutForSampler() });
         mDescriptorPools.insert({ utils::Hash(SAMPLER_LAYOUT_NAME), CreateDescriptorPoolForSampler() });
-        //TODO descriptorService: create descriptor sets for samplers. 
         // Remember that the descriptor set varies with the sampler and the imageview
     
         //create the descriptor sets for each image in the image service.

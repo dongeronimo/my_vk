@@ -40,6 +40,10 @@ namespace vk {
         VkQueue GetPresentationQueue()const { return mPresentationQueue; }
         VkCommandBuffer CreateCommandBuffer(
             const std::string& name);
+        std::vector<VkCommandBuffer> CreateCommandBuffer(
+            const std::string& name,
+            uint32_t count
+        );
         void BeginRecordingCommands(VkCommandBuffer cmd);
         void SubmitAndFinishCommands(VkCommandBuffer cmd);
         void CopyBuffer(VkDeviceSize srcOffset, VkDeviceSize dstOffset,

@@ -16,6 +16,7 @@
 #include <chrono>
 #include "app/timer.h"
 #include <entities/camera_uniform_buffer.h>
+#include "entities/frame.h"
 entities::GameObect* gFoo = nullptr;
 
 int main(int argc, char** argv)
@@ -58,12 +59,13 @@ int main(int argc, char** argv)
         SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
         SetColorBlending(entities::GetNoColorBlend())->
+        SetViewport(entities::GetViewportForSize(1024,768), entities::GetScissor(1024,768))->
         Build();
     //create the synchronization objects
     vk::SyncronizationService syncService;
     //Create a game object
     gFoo = new entities::GameObect("foo", descriptorService, meshService.GetMesh("monkey.glb"));
-    gFoo->SetPosition({ 0,0,0 });
+    gFoo->SetPosition(glm::vec3( 0,0,0 ));
     gFoo->SetOrientation(glm::quat());
     //Define the camera
     entities::CameraUniformBuffer cameraBuffer;
@@ -76,8 +78,28 @@ int main(int argc, char** argv)
     cameraBuffer.proj[1][1] *= -1;
     //define the main loop callback
     app::Timer timer;
-    mainWindow.OnRender = [&timer](app::Window* w) {
+    size_t currentFrame = 0;
+    mainWindow.OnRender = [&timer, &syncService, &currentFrame, 
+        &swapChain, &mainRenderPass, &mainFramebuffer]
+        (app::Window* w) {
         timer.Advance();//advance the clock
+        entities::Frame frame(currentFrame, syncService, swapChain);
+        if (frame.BeginFrame()) 
+        {
+            vk::SetMark({ 0.2f, 0.8f, 0.1f }, "OnScreenRenderPass", frame.CommandBuffer());
+            mainRenderPass.BeginRenderPass({ 1,0,
+                (currentFrame)
+                ,1 }, { 1.0f, 0 }, 
+                mainFramebuffer.GetFramebuffer(currentFrame), { 1024,752 }, frame.CommandBuffer());
+            //render things
+            //end the render pass
+            vk::EndMark(frame.CommandBuffer());
+            mainRenderPass.EndRenderPass(frame.CommandBuffer());
+            //end the frame
+            frame.EndFrame();
+        }
+        currentFrame = currentFrame + 1;
+        currentFrame = currentFrame % MAX_FRAMES_IN_FLIGHT;
     };
     //begin the main loop - blocks here
     mainWindow.MainLoop();

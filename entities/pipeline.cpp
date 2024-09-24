@@ -128,7 +128,6 @@ namespace entities
 
     Pipeline* PipelineBuilder::Build()
     {
-        //TODO pipeline: set the viewport and stencil
         assert(mPipeline->mRenderPass != nullptr);
         assert(mPipeline->mVertexShader != VK_NULL_HANDLE);
         assert(mPipeline->mFragmentShader != VK_NULL_HANDLE);

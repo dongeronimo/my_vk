@@ -114,6 +114,28 @@ namespace vk {
         }
         SET_NAME(mRenderPass, VK_OBJECT_TYPE_RENDER_PASS, name.c_str());
     }
+    void RenderPass::BeginRenderPass(glm::vec4 color, 
+        VkClearDepthStencilValue depth, VkFramebuffer framebuffer,
+        VkExtent2D extent, VkCommandBuffer cmdBuffer)
+    {
+        //begin the render pass of the render pass
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = mRenderPass;
+        renderPassInfo.framebuffer = framebuffer;
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = extent;
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0].color = { {color.r, color.g, color.b, color.a } };
+        clearValues[1].depthStencil = depth;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+        vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    }
+    void RenderPass::EndRenderPass(VkCommandBuffer cmdBuffer)
+    {
+        vkCmdEndRenderPass(cmdBuffer);
+    }
     RenderPass::~RenderPass()
     {
         vkDestroyRenderPass(vk::Device::gDevice->GetDevice(),
