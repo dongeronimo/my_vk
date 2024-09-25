@@ -76,7 +76,7 @@ namespace vk {
             mSwapChainExtent = supportDetails.capabilities.currentExtent;
         }
         else {
-            mSwapChainExtent = { 1024, 768 };
+            mSwapChainExtent = { SCREEN_WIDTH, SCREEN_WIDTH};
             mSwapChainExtent.width = std::max(supportDetails.capabilities.minImageExtent.width,
                 std::min(supportDetails.capabilities.maxImageExtent.width, mSwapChainExtent.width));
             mSwapChainExtent.height = std::max(supportDetails.capabilities.minImageExtent.height,

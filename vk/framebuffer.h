@@ -17,7 +17,7 @@ namespace vk
             RenderPass& renderPass,
             const std::string& name);
         const std::string mName;
-        VkFramebuffer GetFramebuffer(uint32_t idx)const {
+        VkFramebuffer& GetFramebuffer(uint32_t idx)  {
             return mFramebuffers[idx];
         }
     private:

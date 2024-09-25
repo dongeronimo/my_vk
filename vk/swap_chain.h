@@ -16,7 +16,7 @@ namespace vk
         SwapChain();
         ~SwapChain();
         VkExtent2D GetExtent()const { return mSwapChainExtent; }
-        VkSwapchainKHR GetSwapChain()const { return mSwapChain; }
+        VkSwapchainKHR& GetSwapChain() { return mSwapChain; }
         VkImage GetImage(uint32_t which)const { return mSwapChainImages[which]; }
         VkImageView GetImageView(uint32_t which)const { return mSwapChainImageViews[which]; }
         std::vector<VkImageView> GetImageViews()const { return mSwapChainImageViews; }

@@ -84,6 +84,9 @@ namespace entities
     public:
         Pipeline();
         ~Pipeline();
+        VkPipelineLayout PipelineLayout()const {
+            return mPipelineLayout;
+        }
         void Bind(VkCommandBuffer buffer);
         friend class PipelineBuilder;
     private:

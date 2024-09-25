@@ -97,7 +97,7 @@ namespace vk {
     }
     std::vector<VkCommandBuffer> Device::CreateCommandBuffer(const std::string& name, uint32_t count)
     {
-        std::vector<VkCommandBuffer> commandBuffers(MAX_FRAMES_IN_FLIGHT);
+        std::vector<VkCommandBuffer> commandBuffers(count);
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = vk::Device::gDevice->GetCommandPool();

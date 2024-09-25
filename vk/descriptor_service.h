@@ -18,6 +18,7 @@ namespace vk
     /// </summary>
     class DescriptorService {
     public:
+        
         DescriptorService(SamplerService& samplerService,
             ImageService& imageService);
         ~DescriptorService();

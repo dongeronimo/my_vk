@@ -41,15 +41,15 @@ namespace vk
             vkDestroyFence(d, mInFlightFence[i], nullptr);
         }
     }
-    VkSemaphore SyncronizationService::ImagesAvailableSemaphore(uint32_t i) const
+    VkSemaphore& SyncronizationService::ImagesAvailableSemaphore(uint32_t i) 
     {
         return mImagesAvailableSemaphore[i];
     }
-    VkSemaphore SyncronizationService::RenderFinishedSemaphore(uint32_t i) const
+    VkSemaphore& SyncronizationService::RenderFinishedSemaphore(uint32_t i) 
     {
         return mRenderFinishedSemaphore[i];
     }
-    VkFence SyncronizationService::InFlightFences(uint32_t i) const
+    VkFence& SyncronizationService::InFlightFences(uint32_t i) 
     {
         return mInFlightFence[i];
     }

@@ -9,11 +9,16 @@ namespace vk {
     class DescriptorService;
 }
 namespace entities {
+    template<typename t>
+    uint32_t DynamicOffset(uint32_t currentFrame, uint32_t id) {
+        return id * MAX_FRAMES_IN_FLIGHT * currentFrame * sizeof(t);
+    }
     class Mesh;
     class Pipeline;
-    class GameObect {
+    class GameObject {
     public:
-        GameObect(const std::string& name, 
+        
+        GameObject(const std::string& name, 
             vk::DescriptorService& descriptorService,
             const std::string& pipeline,  //TODO staticMeshRenderer: Game Object should not have the mesh
             entities::Mesh* mesh);//TODO staticMeshRenderer: Game Object should not have the mesh
@@ -29,8 +34,9 @@ namespace entities {
         const uint32_t mId;
         const size_t mPipelineHash;
         const std::string mPipelineName;
-        void Draw(VkCommandBuffer cmdBuffer);//TODO staticMeshRenderer: this belongs to StaticMeshRenderer
+        void Draw(VkCommandBuffer cmdBuffer, uint32_t currentFrame);//TODO staticMeshRenderer: this belongs to StaticMeshRenderer
     private:
+        void CopyModelMatrixToDescriptorSetMemory(uint32_t currentFrame);//TODO staticRenderMesh: 
         entities::Mesh* mMesh;
         vk::DescriptorService& mDescriptorService;
         std::vector<VkDescriptorSet> mDescriptorSets;

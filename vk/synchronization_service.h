@@ -8,9 +8,9 @@ namespace vk
     public:
         SyncronizationService();
         ~SyncronizationService();
-        VkSemaphore ImagesAvailableSemaphore(uint32_t i)const;
-        VkSemaphore RenderFinishedSemaphore(uint32_t i)const;
-        VkFence InFlightFences(uint32_t i)const;
+        VkSemaphore& ImagesAvailableSemaphore(uint32_t i);
+        VkSemaphore& RenderFinishedSemaphore(uint32_t i);
+        VkFence& InFlightFences(uint32_t i);
     private:
         std::vector<VkSemaphore> mImagesAvailableSemaphore;
         std::vector<VkSemaphore> mRenderFinishedSemaphore;

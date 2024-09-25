@@ -3,6 +3,7 @@
 #include <vk\descriptor_service.h>
 #include <utils/hash.h>
 #include <vk/debug_utils.h>
+#include "model_matrix_uniform_buffer.h"
 /// <summary>
 /// List of available id for game objects. Its important because there's a limited number of possible
 /// game objects, limited by the number of descriptor sets in the pool and memory allocated on the 
@@ -35,7 +36,7 @@ uint32_t GetNextGameObjectId() {
 }
 namespace entities
 {
-    GameObect::GameObect(const std::string& name, vk::DescriptorService& descriptorService, 
+    GameObject::GameObject(const std::string& name, vk::DescriptorService& descriptorService, 
         const std::string& pipeline,
         entities::Mesh* mesh)
         :mName(name), mId(GetNextGameObjectId()), mDescriptorService(descriptorService), mMesh(mesh),
@@ -45,11 +46,22 @@ namespace entities
         mDescriptorSets = mDescriptorService.DescriptorSet(vk::OBJECT_LAYOUT_NAME, mId);
         mOffsets = mDescriptorService.DescriptorSetsBuffersAddrs(vk::OBJECT_LAYOUT_NAME, mId);
     }
-    void GameObect::Draw(VkCommandBuffer cmdBuffer)
+    void GameObject::Draw(VkCommandBuffer cmdBuffer, uint32_t currentFrame)
     {
-        //Create the debug mark
         vk::SetMark({ 1.0f, 0.8f, 1.0f, 1.0f }, mName, cmdBuffer);
-        //Clear the debug mark
+        CopyModelMatrixToDescriptorSetMemory(currentFrame);
+        //TODO render: bind the mesh
+        //TODO render: bind the descriptor sets
         vk::EndMark(cmdBuffer);
+    }
+    void GameObject::CopyModelMatrixToDescriptorSetMemory(uint32_t currentFrame)
+    {
+        //send the model matrix to the gpu
+        entities::ModelMatrixUniformBuffer modelMatrixUniformBuffer;
+        modelMatrixUniformBuffer.model = glm::mat4(1.0f);
+        modelMatrixUniformBuffer.model *= glm::translate(glm::mat4(1.0f), mPosition);
+        modelMatrixUniformBuffer.model *= glm::mat4_cast(mOrientation);
+        void* modelMatUB = reinterpret_cast<void*>(mOffsets[currentFrame]);
+        memcpy(modelMatUB, &modelMatrixUniformBuffer, sizeof(entities::ModelMatrixUniformBuffer));
     }
 }

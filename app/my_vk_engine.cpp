@@ -17,12 +17,12 @@
 #include "app/timer.h"
 #include <entities/camera_uniform_buffer.h>
 #include "entities/frame.h"
-std::vector<entities::GameObect*> gObjects{};
+std::vector<entities::GameObject*> gObjects{};
 std::map<size_t, entities::Pipeline*> gPipelines;
 int main(int argc, char** argv)
 {
     glfwInit();
-    app::Window mainWindow(1024, 762);
+    app::Window mainWindow(SCREEN_WIDTH, SCREEN_HEIGH);
     //Create the instance
     vk::Instance instance(mainWindow.GetWindow());
     instance.ChoosePhysicalDevice(VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, vk::YES);
@@ -59,13 +59,13 @@ int main(int argc, char** argv)
         SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
         SetColorBlending(entities::GetNoColorBlend())->
-        SetViewport(entities::GetViewportForSize(1024,768), entities::GetScissor(1024,768))-> //TODO resize: hardcoded screen size
+        SetViewport(entities::GetViewportForSize(SCREEN_WIDTH,SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH,SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
         Build();
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
     //create the synchronization objects
     vk::SyncronizationService syncService;
     //Create a game object
-    auto gFoo = new entities::GameObect("foo", descriptorService,"demoPipeline", meshService.GetMesh("monkey.glb"));
+    auto gFoo = new entities::GameObject("foo", descriptorService,"demoPipeline", meshService.GetMesh("monkey.glb"));
     gFoo->SetPosition(glm::vec3( 0,0,0 ));
     gFoo->SetOrientation(glm::quat());
     gObjects.push_back(gFoo);
@@ -81,37 +81,25 @@ int main(int argc, char** argv)
     //define the main loop callback
     app::Timer timer;
     size_t currentFrame = 0;
+    uint32_t imageIndex = UINT32_MAX;
+    std::vector<VkCommandBuffer> commandBuffers = device.CreateCommandBuffer("mainCommandBuffers", MAX_FRAMES_IN_FLIGHT);
+
     mainWindow.OnRender = [&timer, &syncService, &currentFrame, 
         &swapChain, &mainRenderPass, &mainFramebuffer, &descriptorService, &cameraBuffer]
-        (app::Window* w) {
-        timer.Advance();//advance the clock
-        entities::Frame frame(currentFrame, syncService, swapChain);
-        if (frame.BeginFrame()) 
+        (app::Window* w) 
         {
-            vk::SetMark({ 0.2f, 0.8f, 0.1f }, "OnScreenRenderPass", frame.CommandBuffer());
+            timer.Advance();//advance the clock
+            entities::Frame frame(currentFrame, syncService, swapChain);
+            frame.BeginFrame();
             mainRenderPass.BeginRenderPass({ 1,0,1,1 }, { 1.0f, 0 }, 
-                mainFramebuffer.GetFramebuffer(currentFrame), { 1024,752 }, frame.CommandBuffer());//TODO resize: hardcoded screen size
-            //render things
-            entities::Pipeline* pipeline = gPipelines.at(utils::Hash("demoPipeline"));
-            //set the camera data that i'll use
-            std::vector<uintptr_t> cameraUniformBuffersAddr = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
-            void* cameraDstAddr = reinterpret_cast<void*>(cameraUniformBuffersAddr[currentFrame]);
-            memcpy(cameraDstAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
-
-            auto go = gObjects[0];
-            pipeline->Bind(frame.CommandBuffer());
-            go->Draw(frame.CommandBuffer());
-            
-            //end the render pass
-            vk::EndMark(frame.CommandBuffer());
+                mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH}, 
+            frame.CommandBuffer());
             mainRenderPass.EndRenderPass(frame.CommandBuffer());
-            //end the frame
             frame.EndFrame();
-        }
-        currentFrame = currentFrame + 1;
-        currentFrame = currentFrame % MAX_FRAMES_IN_FLIGHT;
+            currentFrame = currentFrame + 1;
+            currentFrame = currentFrame % MAX_FRAMES_IN_FLIGHT;
     };
-    //begin the main loop - blocks here
+    ///begin the main loop - blocks here
     mainWindow.MainLoop();
     return 0;
 }
