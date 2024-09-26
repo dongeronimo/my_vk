@@ -11,13 +11,13 @@ namespace vk {
 namespace entities {
     template<typename t>
     uint32_t DynamicOffset(uint32_t currentFrame, uint32_t id) {
-        return id * MAX_FRAMES_IN_FLIGHT * currentFrame * sizeof(t);
+        return id * MAX_FRAMES_IN_FLIGHT * sizeof(t) + currentFrame ;
     }
     class Mesh;
     class Pipeline;
     class GameObject {
     public:
-        
+        ~GameObject();
         GameObject(const std::string& name, 
             vk::DescriptorService& descriptorService,
             const std::string& pipeline,  //TODO staticMeshRenderer: Game Object should not have the mesh

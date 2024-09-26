@@ -46,11 +46,12 @@ namespace entities
         :mName(name), mId(GetNextGameObjectId()), mDescriptorService(descriptorService), mMesh(mesh),
         mPipelineName(pipeline), mPipelineHash(utils::Hash(pipeline))
     {
+        gAvailableGameObjectsIds[mId] = false;
         //Get the descriptor sets
         mModelMatrixDescriptorSet = mDescriptorService.DescriptorSet(vk::OBJECT_LAYOUT_NAME, mId);
         mModelMatrixOffset = mDescriptorService.DescriptorSetsBuffersAddrs(vk::OBJECT_LAYOUT_NAME, mId);
-        mCameraDescriptorSet = mDescriptorService.DescriptorSet(vk::CAMERA_LAYOUT_NAME, mId);;
-        mCameraOffset = mDescriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, mId);
+        mCameraDescriptorSet = mDescriptorService.DescriptorSet(vk::CAMERA_LAYOUT_NAME, 0);//cameras, for now, are only id=0 because there is only one camera
+        mCameraOffset = mDescriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
     }
 
     void GameObject::Draw(VkCommandBuffer cmdBuffer, 
@@ -90,6 +91,11 @@ namespace entities
             0,
             0);
         vk::EndMark(cmdBuffer);
+    }
+
+    GameObject::~GameObject()
+    {
+        gAvailableGameObjectsIds[mId] = true;
     }
 
     void GameObject::CopyModelMatrixToDescriptorSetMemory(uint32_t currentFrame)

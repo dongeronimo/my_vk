@@ -95,7 +95,6 @@ namespace vk
         auto hash = utils::Hash(name);
         assert(mDescriptorSets.count(hash) > 0);
         auto allDS = mDescriptorSets.at(hash);
-        assert(idx * MAX_FRAMES_IN_FLIGHT < allDS.size());
         //now that only the descriptor set that i want
         std::vector<VkDescriptorSet> slice(MAX_FRAMES_IN_FLIGHT);
         for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -338,7 +337,7 @@ namespace vk
             VkDescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = objBuffer.mBuffer;
             bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(entities::CameraUniformBuffer);
+            bufferInfo.range = sizeof(entities::ModelMatrixUniformBuffer);
             VkWriteDescriptorSet descriptorWrite{};
             descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrite.dstSet = descriptorSets[i];
@@ -348,7 +347,7 @@ namespace vk
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.pBufferInfo = &bufferInfo;
             vkUpdateDescriptorSets(Device::gDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
-            descriptorSetOffsets.push_back(sizeof(entities::CameraUniformBuffer) * i);
+            descriptorSetOffsets.push_back(sizeof(entities::ModelMatrixUniformBuffer) * i);
         }
         //store their offsets
         mDescriptorSetsBuffersOffsets.insert({ utils::Hash(OBJECT_LAYOUT_NAME), descriptorSetOffsets });

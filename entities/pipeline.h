@@ -1,4 +1,5 @@
 #pragma once
+#include <glm/glm.hpp>
 #include <vulkan\vulkan.h>
 #include <vector>
 #include <optional>
@@ -8,6 +9,25 @@ namespace vk {
 }
 namespace entities
 {
+    /// <summary>
+    /// Holds the data for the color push constant.
+    /// </summary>
+    struct alignas(16) ColorPushConstantData {
+        alignas(16)glm::vec4 color;
+    };
+    /// <summary>
+    /// Creates a push constant range for the type T.
+    /// </summary>
+    /// <typeparam name="t"></typeparam>
+    /// <returns></returns>
+    template<typename T>
+    VkPushConstantRange GetPushConstantRangeFor(VkShaderStageFlags stageFlags) {
+        static VkPushConstantRange pushConstantRange = {};
+        pushConstantRange.stageFlags = stageFlags;  // Specify the shader stage(s)
+        pushConstantRange.offset = 0;                               // Offset within the push constant block
+        pushConstantRange.size = sizeof(T); 
+        return pushConstantRange;
+    }
     VkPushConstantRange GetPushConstantRangeForObjectId();
     VkPipelineVertexInputStateCreateInfo GetVertexInputInfoForMesh();
     VkPipelineRasterizationStateCreateInfo GetBackfaceCullClockwiseRasterizationInfo();
@@ -88,6 +108,20 @@ namespace entities
             return mPipelineLayout;
         }
         void Bind(VkCommandBuffer buffer);
+        template<typename T>
+        void SetPushConstant(const T& value, 
+            uint32_t id, 
+            VkCommandBuffer cmdBuffer,
+            VkShaderStageFlags stageFlags, uint32_t offset = 0) {
+            vkCmdPushConstants(
+                cmdBuffer,                   // Command buffer
+                mPipelineLayout,                  // Pipeline layout
+                stageFlags,      // Shader stage(s)
+                offset,                               // Offset within the push constant block
+                sizeof(T),                     // Size of the push constant data
+                &value // Pointer to the data
+            );
+        }
         friend class PipelineBuilder;
     private:
         VkRect2D mScissor;

@@ -61,6 +61,25 @@ int main(int argc, char** argv)
         SetColorBlending(entities::GetNoColorBlend())->
         SetViewport(entities::GetViewportForSize(SCREEN_WIDTH,SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH,SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
         Build();
+    //TODO phong: add depth
+    entities::Pipeline* phongSolidColor = (new entities::PipelineBuilder("phongSolidColor"))->
+        SetPushConstantRanges({ entities::GetPushConstantRangeFor<entities::ColorPushConstantData>(VK_SHADER_STAGE_VERTEX_BIT) })->
+        SetRenderPass(&mainRenderPass)->
+        SetShaderModules(
+            entities::LoadShaderModule(device.GetDevice(), "phong_color.vert.spv"),
+            entities::LoadShaderModule(device.GetDevice(), "phong_color.frag.spv")
+        )->
+        SetDescriptorSetLayouts({ //TODO phong: add per-frag lightining data
+            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
+            descriptorService.DescriptorSetLayout(vk::OBJECT_LAYOUT_NAME) })->
+        SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
+        SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
+        SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
+        SetColorBlending(entities::GetNoColorBlend())->
+        SetViewport(entities::GetViewportForSize(SCREEN_WIDTH, SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH, SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
+        Build();
+
+    gPipelines.insert({ utils::Hash("phongSolidColor") , phongSolidColor });
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
     //create the synchronization objects
     vk::SyncronizationService syncService;
@@ -69,6 +88,10 @@ int main(int argc, char** argv)
     gFoo->SetPosition(glm::vec3( 0,0,0 ));
     gFoo->SetOrientation(glm::quat());
     gObjects.push_back(gFoo);
+    auto gBar = new entities::GameObject("bar", descriptorService, "demoPipeline", meshService.GetMesh("monkey.glb"));
+    gBar->SetPosition(glm::vec3(2, 0, 0));
+    gBar->SetOrientation(glm::quat());
+    gObjects.push_back(gBar);
     //Define the camera
     entities::CameraUniformBuffer cameraBuffer;
     cameraBuffer.cameraPos = glm::vec3(5.0f, 5.0f, 5.0f);
@@ -91,7 +114,7 @@ int main(int argc, char** argv)
             timer.Advance();//advance the clock
             entities::Frame frame(currentFrame, syncService, swapChain);
             frame.BeginFrame();
-            mainRenderPass.BeginRenderPass({ 1,0,1,1 }, { 1.0f, 0 }, 
+            mainRenderPass.BeginRenderPass({ 1,1,1,1 }, { 1.0f, 0 }, 
                 mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH }, 
             frame.CommandBuffer());
             //set the camera data for the main render pass, all objects will use the same camera
