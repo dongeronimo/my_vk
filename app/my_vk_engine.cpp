@@ -92,8 +92,19 @@ int main(int argc, char** argv)
             entities::Frame frame(currentFrame, syncService, swapChain);
             frame.BeginFrame();
             mainRenderPass.BeginRenderPass({ 1,0,1,1 }, { 1.0f, 0 }, 
-                mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH}, 
+                mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH }, 
             frame.CommandBuffer());
+            //set the camera data for the main render pass, all objects will use the same camera
+            std::vector<uintptr_t> cameraDescriptorSetsAddrs = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
+            void* cameraDescriptorSetAddr = reinterpret_cast<void*>(cameraDescriptorSetsAddrs[currentFrame]);
+            memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
+            //bind the pipeline
+            auto pipeline = gPipelines.at(utils::Hash("demoPipeline"));
+            pipeline->Bind(frame.CommandBuffer());
+            //draw the objects
+            for (auto& go : gObjects) {
+                go->Draw(frame.CommandBuffer(), *pipeline , currentFrame);
+            }
             mainRenderPass.EndRenderPass(frame.CommandBuffer());
             frame.EndFrame();
             currentFrame = currentFrame + 1;

@@ -34,13 +34,17 @@ namespace entities {
         const uint32_t mId;
         const size_t mPipelineHash;
         const std::string mPipelineName;
-        void Draw(VkCommandBuffer cmdBuffer, uint32_t currentFrame);//TODO staticMeshRenderer: this belongs to StaticMeshRenderer
+        void Draw(VkCommandBuffer cmdBuffer, 
+            Pipeline& pipeline,
+            uint32_t currentFrame);//TODO staticMeshRenderer: this belongs to StaticMeshRenderer
     private:
         void CopyModelMatrixToDescriptorSetMemory(uint32_t currentFrame);//TODO staticRenderMesh: 
         entities::Mesh* mMesh;
         vk::DescriptorService& mDescriptorService;
-        std::vector<VkDescriptorSet> mDescriptorSets;
-        std::vector<uintptr_t> mOffsets;
+        std::vector<VkDescriptorSet> mModelMatrixDescriptorSet;
+        std::vector<uintptr_t> mModelMatrixOffset;
+        std::vector<VkDescriptorSet> mCameraDescriptorSet;
+        std::vector<uintptr_t> mCameraOffset;
         glm::vec3 mPosition;
         glm::quat mOrientation;
     };

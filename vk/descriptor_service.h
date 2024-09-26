@@ -6,7 +6,8 @@ namespace vk
 {
     class SamplerService;
     class ImageService;
-
+    const uint32_t CAMERA_SET = 0;
+    const uint32_t MODEL_MATRIX_SET = 1;
     const uint32_t MAX_NUMBER_OF_OBJECTS = 10000 * MAX_FRAMES_IN_FLIGHT;
     const uint32_t MAX_NUMBER_OF_CAMERAS = MAX_FRAMES_IN_FLIGHT;
     const std::string CAMERA_LAYOUT_NAME = "CameraDataDescriptorSet";
