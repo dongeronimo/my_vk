@@ -384,8 +384,7 @@ namespace vk
         //5)fill the tables
         mDescriptorSetBuffers.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), modelBuffer});
         mBaseAddesses.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), baseAddress });
-        mDescriptorSetsBuffersOffsets.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), 
-            dynamicOffsets });
+        mDescriptorSetsBuffersOffsets.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), dynamicOffsets });
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             auto name = Concatenate(MODEL_MATRIX_LAYOUT_NAME, "DescriptorSetForFrame", i);
             SET_NAME(descriptorSets[i], VK_OBJECT_TYPE_DESCRIPTOR_SET, name.c_str());
@@ -530,10 +529,10 @@ namespace vk
         const VkPhysicalDevice physicalDevice = Instance::gInstance->GetPhysicalDevice();
         const VkDescriptorSetLayout descriptorSetLayout = mLayouts.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
         const VkDescriptorPool descriptorPool = mDescriptorPools.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
-        //Calculate the buffers sizes
+        //1) Calculate the buffers sizes
         const VkDeviceSize directionalLightSize = vk::CalculateAlignedSize<entities::DirectionalLightUniformBuffer>() * MAX_FRAMES_IN_FLIGHT;
         const VkDeviceSize ambientLightSize = vk::CalculateAlignedSize<entities::AmbientLightUniformBuffer>() * MAX_FRAMES_IN_FLIGHT;
-        //Create the buffers, their memories and maps
+        //2) Create the buffers, their memories and maps
         uintptr_t directionalLightBaseAddress;
         DescriptorSetBuffer directionalLightBuffer = CreateBuffer(1,
             directionalLightSize,
@@ -552,6 +551,69 @@ namespace vk
         auto ambientLightmemoryName = Concatenate(LIGHTNING_LAYOUT_NAME, "Memory");
         SET_NAME(ambientLightBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, ambientLightbufferName.c_str());
         SET_NAME(ambientLightBuffer.mMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, ambientLightmemoryName.c_str());
+        //3)Create the descriptor sets
+        VkDescriptorSetLayout descriptorSetLayout = mLayouts.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
+        std::vector<VkDescriptorSet> descriptorSets(MAX_FRAMES_IN_FLIGHT);
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool; // The descriptor pool you created
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.pSetLayouts = layouts.data();
+        std::vector<VkDescriptorSet> descriptorSets(MAX_FRAMES_IN_FLIGHT);
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorBufferInfo directionalLightBufferInfo = {};
+            directionalLightBufferInfo.buffer = directionalLightBuffer.mBuffer;  // The buffer you created
+            directionalLightBufferInfo.offset = 0;
+            directionalLightBufferInfo.range = directionalLightSize;  // Total size of 16 lights (direction + color)
 
+            VkDescriptorBufferInfo ambientLightBufferInfo = {};
+            ambientLightBufferInfo.buffer = ambientLightBuffer.mBuffer;  // The buffer you created
+            ambientLightBufferInfo.offset = 0;
+            ambientLightBufferInfo.range = ambientLightSize;  // Size of the ambient light (vec4)
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+            // Binding 0: DirectionalLightUniformBuffer
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = descriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &directionalLightBufferInfo;
+
+            // Binding 1: AmbientLightUniformBuffer
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = descriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pBufferInfo = &ambientLightBufferInfo;
+
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+        //4) Calculate the offsets
+        std::vector<uintptr_t> ambientAddrs;
+        std::vector<uintptr_t> directionalAddrs;
+        for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            uintptr_t currAmbientOffset = ambientLightBaseAddress + ambientLightSize * i;
+            ambientAddrs.push_back(currAmbientOffset);
+            uintptr_t currDirectionalOffset = directionalLightBaseAddress + directionalLightSize * i;
+            directionalAddrs.push_back(currAmbientOffset);
+        }
+        //5) save to the tables
+        auto ambient_name = Concatenate(LIGHTNING_LAYOUT_NAME, "Ambient");
+        mDescriptorSetBuffers.insert({ utils::Hash(ambient_name), ambientLightBuffer });
+        mBaseAddesses.insert({ utils::Hash(ambient_name), ambientLightBaseAddress });
+        mDescriptorSetsBuffersOffsets.insert({ utils::Hash(ambient_name), ambientAddrs });
+        auto directional_name = Concatenate(LIGHTNING_LAYOUT_NAME, "Directional");
+        mDescriptorSetBuffers.insert({ utils::Hash(directional_name), directionalLightBuffer });
+        mBaseAddesses.insert({ utils::Hash(directional_name), directionalLightBaseAddress });
+        mDescriptorSetsBuffersOffsets.insert({ utils::Hash(directional_name), directionalAddrs });
     }
 }
