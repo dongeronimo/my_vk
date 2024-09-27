@@ -2,8 +2,19 @@
 #include <map>
 #include <vector>
 #include <vulkan/vulkan.h>
+#include "utils/hash.h"
 namespace vk
 {
+    template<typename t>
+    uintptr_t CalculateDynamicOffset(uint32_t currentFrame, uint32_t maxNumber, uint32_t id) {
+        constexpr size_t modelDataSize = sizeof(t);
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(vk::Instance::gInstance->GetPhysicalDevice(), &deviceProperties);
+        const VkDeviceSize minUniformBufferOffsetAlignment = deviceProperties.limits.minUniformBufferOffsetAlignment;
+        const VkDeviceSize alignedModelDataSize = (modelDataSize + minUniformBufferOffsetAlignment - 1) & ~(minUniformBufferOffsetAlignment - 1);
+        VkDeviceSize bufferOffset = (currentFrame * maxNumber + id) * alignedModelDataSize;
+        return bufferOffset;
+    }
     class SamplerService;
     class ImageService;
     const uint32_t CAMERA_SET = 0;
@@ -26,9 +37,14 @@ namespace vk
         VkDescriptorSetLayout DescriptorSetLayout(const std::string& name)const;
         std::vector<VkDescriptorSet> DescriptorSet(const std::string& name,
             uint32_t idx)const;
+        std::vector<VkDescriptorSet> DescriptorSet(const std::string& name)const;
         std::vector<uintptr_t> DescriptorSetsBuffersAddrs(const std::string& name,
             uint32_t idx)const;
-        uintptr_t DescriptorSetDynamicOffset(const std::string& name, uint32_t idx);
+        uintptr_t ModelMatrixDescriptorSetDynamicOffset( uint32_t idx);
+
+        uintptr_t ModelMatrixBaseAddress() {
+            return mBaseAddesses.at(utils::Hash(MODEL_MATRIX_LAYOUT_NAME));
+        }
     private:
         SamplerService& mSamplerService;
         struct DescriptorSetBuffer {

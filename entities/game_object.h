@@ -9,17 +9,7 @@ namespace vk {
     class DescriptorService;
 }
 namespace entities {
-    template<typename t>
-    uint32_t DynamicOffset(uint32_t currentFrame, uint32_t id, 
-        VkPhysicalDevice physicalDevice) {
-        size_t fooSize = sizeof(t);
-        VkPhysicalDeviceProperties properties;
-        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-        VkDeviceSize minAlignment = properties.limits.minUniformBufferOffsetAlignment;
-        VkDeviceSize alignedSize = (fooSize + minAlignment - 1) & ~(minAlignment - 1);
-        VkDeviceSize dynamicOffset = (currentFrame * MAX_FRAMES_IN_FLIGHT + id)*alignedSize;
-        return static_cast<uint32_t>(dynamicOffset);
-    }
+
     class Mesh;
     class Pipeline;
     class GameObject {
@@ -49,7 +39,7 @@ namespace entities {
         entities::Mesh* mMesh;
         vk::DescriptorService& mDescriptorService;
         std::vector<VkDescriptorSet> mModelMatrixDescriptorSet;
-        std::vector<uintptr_t> mModelMatrixOffset;
+        //std::vector<uintptr_t> mModelMatrixOffset;
         std::vector<VkDescriptorSet> mCameraDescriptorSet;
         std::vector<uintptr_t> mCameraOffset;
         glm::vec3 mPosition;

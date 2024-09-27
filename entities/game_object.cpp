@@ -49,8 +49,10 @@ namespace entities
     {
         gAvailableGameObjectsIds[mId] = false;
         //Get the descriptor sets
-        mModelMatrixDescriptorSet = mDescriptorService.DescriptorSet(vk::MODEL_MATRIX_LAYOUT_NAME, mId);
-        mModelMatrixOffset = mDescriptorService.DescriptorSetsBuffersAddrs(vk::MODEL_MATRIX_LAYOUT_NAME, mId);
+        //there are just MAX_FRAMES_IN_FLIGHT descriptor sets 
+        mModelMatrixDescriptorSet = mDescriptorService.DescriptorSet(vk::MODEL_MATRIX_LAYOUT_NAME);
+
+        //mModelMatrixOffset = mDescriptorService.DescriptorSetsBuffersAddrs(vk::MODEL_MATRIX_LAYOUT_NAME, mId);
         mCameraDescriptorSet = mDescriptorService.DescriptorSet(vk::CAMERA_LAYOUT_NAME, 0);//cameras, for now, are only id=0 because there is only one camera
         mCameraOffset = mDescriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
     }
@@ -63,7 +65,6 @@ namespace entities
         //bind the mesh.
         mMesh->Bind(cmdBuffer);
         //bind the descriptor sets
-        uint32_t cameraDynamicOffset = DynamicOffset<entities::CameraUniformBuffer>(currentFrame, 0, vk::Instance::gInstance->GetPhysicalDevice());
         vkCmdBindDescriptorSets(
             cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipeline.PipelineLayout(),
@@ -73,7 +74,8 @@ namespace entities
             0,
             nullptr
         );
-        uint32_t modelMatrixDynamicOffset = DynamicOffset<entities::ModelMatrixUniformBuffer>(currentFrame, mId, vk::Instance::gInstance->GetPhysicalDevice());
+        uint32_t modelMatrixDynamicOffset = vk::CalculateDynamicOffset<entities::ModelMatrixUniformBuffer>(currentFrame,
+            vk::MAX_NUMBER_OF_OBJECTS, mId);
         vkCmdBindDescriptorSets(
             cmdBuffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -81,8 +83,8 @@ namespace entities
             vk::MODEL_MATRIX_SET,                                  
             1,                                 
             &mModelMatrixDescriptorSet[currentFrame],               
-            0,
-            nullptr
+            1,
+            &modelMatrixDynamicOffset
         );
         //Draw command
         vkCmdDrawIndexed(cmdBuffer,
@@ -101,12 +103,16 @@ namespace entities
 
     void GameObject::CopyModelMatrixToDescriptorSetMemory(uint32_t currentFrame)
     {
-        //send the model matrix to the gpu
+        uintptr_t bufferOffset = vk::CalculateDynamicOffset<entities::ModelMatrixUniformBuffer>(currentFrame,
+            vk::MAX_NUMBER_OF_OBJECTS, mId);
+        //Get the beginning of the buffer
+        uintptr_t baseAddress = mDescriptorService.ModelMatrixBaseAddress();
+        uintptr_t position = baseAddress + bufferOffset;
+        //assembles the model matrix
         entities::ModelMatrixUniformBuffer modelMatrixUniformBuffer;
         modelMatrixUniformBuffer.model = glm::mat4(1.0f);
         modelMatrixUniformBuffer.model *= glm::translate(glm::mat4(1.0f), mPosition);
         modelMatrixUniformBuffer.model *= glm::mat4_cast(mOrientation);
-        void* modelMatUB = reinterpret_cast<void*>(mModelMatrixOffset[currentFrame]);
-        memcpy(modelMatUB, &modelMatrixUniformBuffer, sizeof(entities::ModelMatrixUniformBuffer));
+        memcpy(reinterpret_cast<void*>(position), &modelMatrixUniformBuffer, sizeof(entities::ModelMatrixUniformBuffer));
     }
 }
