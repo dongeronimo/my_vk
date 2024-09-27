@@ -20,6 +20,7 @@ namespace vk
             VkCommandBuffer cmdBuffer);
         void EndRenderPass(VkCommandBuffer cmdBuffer);
         ~RenderPass();
+        const std::string mName;
     private:
         VkRenderPass mRenderPass = VK_NULL_HANDLE;
     };

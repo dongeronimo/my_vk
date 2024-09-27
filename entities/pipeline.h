@@ -107,6 +107,7 @@ namespace entities
         VkPipelineLayout PipelineLayout()const {
             return mPipelineLayout;
         }
+        size_t Hash() { return mHash; }
         void Bind(VkCommandBuffer buffer);
         template<typename T>
         void SetPushConstant(const T& value, 
@@ -124,6 +125,7 @@ namespace entities
         }
         friend class PipelineBuilder;
     private:
+        size_t mHash;
         VkRect2D mScissor;
         VkViewport mViewport;
         VkPipelineColorBlendStateCreateInfo mColorBlending{};

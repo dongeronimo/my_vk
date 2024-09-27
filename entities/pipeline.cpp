@@ -7,6 +7,7 @@
 #include <vk/render_pass.h>
 #include <vk/descriptor_service.h>
 #include "mesh.h"
+#include <utils/hash.h>
 namespace entities
 {
     VkPushConstantRange GetPushConstantRangeForObjectId()
@@ -212,6 +213,7 @@ namespace entities
             throw std::runtime_error("failed to create graphics pipeline!");
         }
         SET_NAME(mPipeline->mPipeline, VK_OBJECT_TYPE_PIPELINE, mName.c_str());
+        mPipeline->mHash = utils::Hash(mName);
         auto result = mPipeline;
         mPipeline = nullptr;
         return result;

@@ -3,7 +3,7 @@
 #include "device.h"
 #include "debug_utils.h"
 namespace vk {
-    RenderPass::RenderPass(VkFormat colorFormat, const std::string& name)
+    RenderPass::RenderPass(VkFormat colorFormat, const std::string& name):mName(name)
     {
         //the image that'll hold the result
         VkAttachmentDescription colorAttachment{};

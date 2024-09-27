@@ -17,8 +17,24 @@
 #include "app/timer.h"
 #include <entities/camera_uniform_buffer.h>
 #include "entities/frame.h"
+#include <algorithm>
+
+typedef size_t renderpass_hash_t;
+typedef size_t pipeline_hash_t;
+
+
 std::vector<entities::GameObject*> gObjects{};
-std::map<size_t, entities::Pipeline*> gPipelines;
+std::map<pipeline_hash_t, entities::Pipeline*> gPipelines;
+/// <summary>
+/// one renderpass mau have 0..n pipelines
+/// </summary>
+std::map<renderpass_hash_t, std::vector<pipeline_hash_t>> gRenderPassPipelineTable;
+/// <summary>
+/// Holds the render passes, on the order they are to be run
+/// </summary>
+std::vector<vk::RenderPass*> gOrderedRenderpasses;
+
+std::map<pipeline_hash_t, std::vector<entities::GameObject*>> gPipelineGameObjectTable;
 int main(int argc, char** argv)
 {
     glfwInit();
@@ -32,10 +48,11 @@ int main(int argc, char** argv)
     vk::SwapChain swapChain;
     //create the render pass for onscreen rendering
     //TODO depth buffer - remeber that we have a version that uses depth buffer.
-    vk::RenderPass mainRenderPass( swapChain.GetFormat(), "mainRenderPass");
+    vk::RenderPass* mainRenderPass = new vk::RenderPass( swapChain.GetFormat(), "mainRenderPass");
+    gOrderedRenderpasses.push_back(mainRenderPass);
     //create the framebuffer for onscreen rendering
     //TODO depth buffer - no depth buffer, need to add one
-    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), swapChain.GetExtent(), mainRenderPass, "mainFramebuffer");
+    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), swapChain.GetExtent(), *mainRenderPass, "mainFramebuffer");
     //create the samplers
     vk::SamplerService samplersService;
     //create the images
@@ -47,7 +64,7 @@ int main(int argc, char** argv)
     vk::MeshService meshService({ "monkey.glb" });
     //create the pipelines
     entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline"))->
-        SetRenderPass(&mainRenderPass)->
+        SetRenderPass(mainRenderPass)->
         SetShaderModules(
             entities::LoadShaderModule(device.GetDevice(), "demo.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "demo.frag.spv")
@@ -61,10 +78,11 @@ int main(int argc, char** argv)
         SetColorBlending(entities::GetNoColorBlend())->
         SetViewport(entities::GetViewportForSize(SCREEN_WIDTH,SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH,SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
         Build();
+
     //TODO phong: add depth
     entities::Pipeline* phongSolidColor = (new entities::PipelineBuilder("phongSolidColor"))->
         SetPushConstantRanges({ entities::GetPushConstantRangeFor<entities::ColorPushConstantData>(VK_SHADER_STAGE_VERTEX_BIT) })->
-        SetRenderPass(&mainRenderPass)->
+        SetRenderPass(mainRenderPass)->
         SetShaderModules(
             entities::LoadShaderModule(device.GetDevice(), "phong_color.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "phong_color.frag.spv")
@@ -81,6 +99,8 @@ int main(int argc, char** argv)
 
     gPipelines.insert({ utils::Hash("phongSolidColor") , phongSolidColor });
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
+    //register that mainRenderPass has these pipelines
+    gRenderPassPipelineTable.insert({ utils::Hash("mainRenderPass"), {utils::Hash("phongSolidColor"),  utils::Hash("demoPipeline")} });
     //create the synchronization objects
     vk::SyncronizationService syncService;
     //Create a game object
@@ -92,6 +112,9 @@ int main(int argc, char** argv)
     gBar->SetPosition(glm::vec3(2, 0, 0));
     gBar->SetOrientation(glm::quat());
     gObjects.push_back(gBar);
+    //add the game objects to their pipelines
+   // gPipelineGameObjectTable.insert({ utils::Hash("phongSolidColor"), {gFoo} });
+    gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar, gFoo}});
     //Define the camera
     entities::CameraUniformBuffer cameraBuffer;
     cameraBuffer.cameraPos = glm::vec3(5.0f, 5.0f, 5.0f);
@@ -108,30 +131,61 @@ int main(int argc, char** argv)
     std::vector<VkCommandBuffer> commandBuffers = device.CreateCommandBuffer("mainCommandBuffers", MAX_FRAMES_IN_FLIGHT);
 
     mainWindow.OnRender = [&timer, &syncService, &currentFrame, 
-        &swapChain, &mainRenderPass, &mainFramebuffer, &descriptorService, &cameraBuffer]
+        &swapChain, &mainFramebuffer, &descriptorService, &cameraBuffer]
         (app::Window* w) 
         {
             timer.Advance();//advance the clock
             entities::Frame frame(currentFrame, syncService, swapChain);
             frame.BeginFrame();
-            mainRenderPass.BeginRenderPass({ 1,1,1,1 }, { 1.0f, 0 }, 
-                mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH }, 
-            frame.CommandBuffer());
-            //set the camera data for the main render pass, all objects will use the same camera
-            std::vector<uintptr_t> cameraDescriptorSetsAddrs = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
-            void* cameraDescriptorSetAddr = reinterpret_cast<void*>(cameraDescriptorSetsAddrs[currentFrame]);
-            memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
-            //bind the pipeline
-            auto pipeline = gPipelines.at(utils::Hash("demoPipeline"));
-            pipeline->Bind(frame.CommandBuffer());
-            //draw the objects
-            for (auto& go : gObjects) {
-                go->Draw(frame.CommandBuffer(), *pipeline , currentFrame);
+            for (auto R : gOrderedRenderpasses) {
+                //for each render pass R begin R
+                R->BeginRenderPass({ 1,1,1,1 }, { 1.0f, 0 },
+                    mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH },
+                    frame.CommandBuffer());
+                //for each pipeline P of R bind P
+                std::vector<pipeline_hash_t> pipelineHashes = gRenderPassPipelineTable.at(utils::Hash(R->mName));
+                std::vector<entities::Pipeline*> pipelines(pipelineHashes.size());
+                std::transform(pipelineHashes.begin(), pipelineHashes.end(), pipelines.begin(), [](auto h) {
+                    return gPipelines.at(h);
+                });
+                for (auto P : pipelines) {
+                    // Bind the pipeline
+                    P->Bind(frame.CommandBuffer());
+                    //set the camera data for the main render pass, all objects will use the same camera
+                    std::vector<uintptr_t> cameraDescriptorSetsAddrs = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
+                    void* cameraDescriptorSetAddr = reinterpret_cast<void*>(cameraDescriptorSetsAddrs[currentFrame]);
+                    memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
+                    //for each gameobject G that uses P draw G
+                    if (gPipelineGameObjectTable.count(P->Hash())>0)
+                    {
+                        std::vector<entities::GameObject*> gameObjects = gPipelineGameObjectTable.at(P->Hash());
+                        for (auto G : gameObjects) {
+                            //Draw the object
+                            G->Draw(frame.CommandBuffer(), *P, currentFrame);
+                        }
+                    }
+                }
+                //finish R
+                R->EndRenderPass(frame.CommandBuffer());
             }
-            mainRenderPass.EndRenderPass(frame.CommandBuffer());
             frame.EndFrame();
             currentFrame = currentFrame + 1;
             currentFrame = currentFrame % MAX_FRAMES_IN_FLIGHT;
+            ////set the camera data for the main render pass, all objects will use the same camera
+            //std::vector<uintptr_t> cameraDescriptorSetsAddrs = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
+            //void* cameraDescriptorSetAddr = reinterpret_cast<void*>(cameraDescriptorSetsAddrs[currentFrame]);
+            //memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
+            ////bind the pipeline
+            //auto pipeline = gPipelines.at(utils::Hash("demoPipeline"));
+            //pipeline->Bind(frame.CommandBuffer());
+            ////draw the objects
+            //for (auto& go : gObjects) {
+            //    go->Draw(frame.CommandBuffer(), *pipeline , currentFrame);
+            //}
+            //mainRenderPass.EndRenderPass(frame.CommandBuffer());
+            //frame.EndFrame();
+            //currentFrame = currentFrame + 1;
+            //currentFrame = currentFrame % MAX_FRAMES_IN_FLIGHT;
     };
     ///begin the main loop - blocks here
     mainWindow.MainLoop();
