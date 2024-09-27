@@ -6,12 +6,18 @@
 namespace vk
 {
     template<typename t>
-    uintptr_t CalculateDynamicOffset(uint32_t currentFrame, uint32_t maxNumber, uint32_t id) {
+    VkDeviceSize CalculateAlignedSize() {
         constexpr size_t modelDataSize = sizeof(t);
         VkPhysicalDeviceProperties deviceProperties;
         vkGetPhysicalDeviceProperties(vk::Instance::gInstance->GetPhysicalDevice(), &deviceProperties);
         const VkDeviceSize minUniformBufferOffsetAlignment = deviceProperties.limits.minUniformBufferOffsetAlignment;
         const VkDeviceSize alignedModelDataSize = (modelDataSize + minUniformBufferOffsetAlignment - 1) & ~(minUniformBufferOffsetAlignment - 1);
+        return alignedModelDataSize;
+    }
+
+    template<typename t>
+    uintptr_t CalculateDynamicOffset(uint32_t currentFrame, uint32_t maxNumber, uint32_t id) {
+        const VkDeviceSize alignedModelDataSize = CalculateAlignedSize<t>();
         VkDeviceSize bufferOffset = (currentFrame * maxNumber + id) * alignedModelDataSize;
         return bufferOffset;
     }
@@ -21,6 +27,7 @@ namespace vk
     const uint32_t MODEL_MATRIX_SET = 1;
     const uint32_t MAX_NUMBER_OF_OBJECTS = 10000 * MAX_FRAMES_IN_FLIGHT;
     const uint32_t MAX_NUMBER_OF_CAMERAS = MAX_FRAMES_IN_FLIGHT;
+    const std::string LIGHTNING_LAYOUT_NAME = "LightningDescriptorSet";
     const std::string CAMERA_LAYOUT_NAME = "CameraDataDescriptorSet";
     const std::string MODEL_MATRIX_LAYOUT_NAME = "ModelMatrixDescriptorSet";
     const std::string SAMPLER_LAYOUT_NAME = "SamplerDescriptorSet";
@@ -99,5 +106,9 @@ namespace vk
             VkImageView imageView,
             VkSampler sampler,
             const std::string& name);
+
+        void CreateDescriptorSetLayoutForLight();
+        void CreateDescriptorPoolForLight();
+        void CreateDescriptorSetForLight();
     };
 }

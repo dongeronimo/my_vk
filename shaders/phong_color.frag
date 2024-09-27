@@ -1,7 +1,7 @@
 #version 450
 layout (set = 2, binding = 0) uniform DirectionalLightUniformBuffer{
-    vec3 direction;
-    vec4 colorAndIntensity;
+    vec3 direction[16];
+    vec4 colorAndIntensity[16];
 } directionalLight;
 layout (set = 2, binding = 1) uniform AmbientLightUniformBuffer {
     vec4 colorAndIntensity;

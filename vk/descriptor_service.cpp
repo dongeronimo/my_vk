@@ -9,6 +9,7 @@
 #include "samplers_service.h"
 #include "image_service.h"
 #include "vk\instance.h"
+#include "entities\light_uniform_buffer.h"
 const uint32_t MODEL_POOL_SIZE = 10000;
 const uint32_t SAMPLER_POOL_SIZE = 1000;
 
@@ -63,6 +64,9 @@ namespace vk
                 mySampler,
                 "floor01.jpg")
                     });
+        CreateDescriptorSetLayoutForLight();
+        CreateDescriptorPoolForLight();
+        CreateDescriptorSetForLight();
     }
     DescriptorService::~DescriptorService()
     {
@@ -465,5 +469,89 @@ namespace vk
             vkUpdateDescriptorSets(Device::gDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
         }
         return descriptorSets;
+    }
+    void DescriptorService::CreateDescriptorSetLayoutForLight()
+    {
+        //directional light
+        VkDescriptorSetLayoutBinding directionalLightBinding = {};
+        directionalLightBinding.binding = 0; // Corresponds to set = 2, binding = 0
+        directionalLightBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        directionalLightBinding.descriptorCount = 1;
+        directionalLightBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        directionalLightBinding.pImmutableSamplers = nullptr; // Not used for uniform buffers
+        //ambient light
+        VkDescriptorSetLayoutBinding ambientLightBinding = {};
+        ambientLightBinding.binding = 1; // Corresponds to set = 2, binding = 1
+        ambientLightBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        ambientLightBinding.descriptorCount = 1;
+        ambientLightBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        ambientLightBinding.pImmutableSamplers = nullptr;
+        std::array<VkDescriptorSetLayoutBinding, 2> bindings = { directionalLightBinding, ambientLightBinding };
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+        VkDescriptorSetLayout descriptorSetLayout;
+        if (vkCreateDescriptorSetLayout(vk::Device::gDevice->GetDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+        auto name = Concatenate(LIGHTNING_LAYOUT_NAME,"Layout");
+        SET_NAME(descriptorSetLayout, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, name.c_str());
+        mLayouts.insert({ utils::Hash(LIGHTNING_LAYOUT_NAME), descriptorSetLayout });
+    }
+
+    void DescriptorService::CreateDescriptorPoolForLight()
+    {
+        std::array<VkDescriptorPoolSize, 2> poolSizes;
+        // Pool size for directional light (binding = 0, type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT; // One for each frame in flight
+
+        // Pool size for ambient light (binding = 1, type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT; // One for each frame in flight
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = poolSizes.size(); // Two types of descriptors (directional and ambient light)
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT; // One set per frame
+        VkDescriptorPool descriptorPool;
+        if (vkCreateDescriptorPool(vk::Device::gDevice->GetDevice(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+        auto name = Concatenate(LIGHTNING_LAYOUT_NAME, "Pool");
+        SET_NAME(descriptorPool, VK_OBJECT_TYPE_DESCRIPTOR_POOL, name.c_str());
+        mDescriptorPools.insert({ utils::Hash(LIGHTNING_LAYOUT_NAME), descriptorPool });
+    }
+    void DescriptorService::CreateDescriptorSetForLight()
+    {
+        const VkDevice device = Device::gDevice->GetDevice();
+        const VkPhysicalDevice physicalDevice = Instance::gInstance->GetPhysicalDevice();
+        const VkDescriptorSetLayout descriptorSetLayout = mLayouts.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
+        const VkDescriptorPool descriptorPool = mDescriptorPools.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
+        //Calculate the buffers sizes
+        const VkDeviceSize directionalLightSize = vk::CalculateAlignedSize<entities::DirectionalLightUniformBuffer>() * MAX_FRAMES_IN_FLIGHT;
+        const VkDeviceSize ambientLightSize = vk::CalculateAlignedSize<entities::AmbientLightUniformBuffer>() * MAX_FRAMES_IN_FLIGHT;
+        //Create the buffers, their memories and maps
+        uintptr_t directionalLightBaseAddress;
+        DescriptorSetBuffer directionalLightBuffer = CreateBuffer(1,
+            directionalLightSize,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, directionalLightBaseAddress);
+        auto directionaLightbufferName = Concatenate(LIGHTNING_LAYOUT_NAME, "Buffer");
+        auto directionaLightmemoryName = Concatenate(LIGHTNING_LAYOUT_NAME, "Memory");
+        SET_NAME(directionalLightBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, directionaLightbufferName.c_str());
+        SET_NAME(directionalLightBuffer.mMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, directionaLightmemoryName.c_str());
+        uintptr_t ambientLightBaseAddress;
+        DescriptorSetBuffer ambientLightBuffer = CreateBuffer(1,
+            directionalLightSize,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, ambientLightBaseAddress);
+        auto ambientLightbufferName = Concatenate(LIGHTNING_LAYOUT_NAME, "Buffer");
+        auto ambientLightmemoryName = Concatenate(LIGHTNING_LAYOUT_NAME, "Memory");
+        SET_NAME(ambientLightBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, ambientLightbufferName.c_str());
+        SET_NAME(ambientLightBuffer.mMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, ambientLightmemoryName.c_str());
+
     }
 }
