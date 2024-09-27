@@ -8,6 +8,7 @@
 #include <entities/model_matrix_uniform_buffer.h>
 #include "samplers_service.h"
 #include "image_service.h"
+#include "vk\instance.h"
 const uint32_t MODEL_POOL_SIZE = 10000;
 const uint32_t SAMPLER_POOL_SIZE = 1000;
 
@@ -21,9 +22,9 @@ namespace vk
         mDescriptorPools.insert({ utils::Hash(CAMERA_LAYOUT_NAME), CreateDescriptorPoolForCamera() });
         mDescriptorSets.insert({ utils::Hash(CAMERA_LAYOUT_NAME), CreateDescriptorSetForCamera() });
         
-        mLayouts.insert({ utils::Hash(OBJECT_LAYOUT_NAME), CreateDescriptorSetLayoutForObject() });
-        mDescriptorPools.insert({ utils::Hash(OBJECT_LAYOUT_NAME), CreateDescriptorPoolForModelMatrix() });
-        mDescriptorSets.insert({ utils::Hash(OBJECT_LAYOUT_NAME), CreateDescriptorSetForModelMatrix() });
+        mLayouts.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), CreateDescriptorSetLayoutForObject() });
+        mDescriptorPools.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), CreateDescriptorPoolForModelMatrix() });
+        mDescriptorSets.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), CreateDescriptorSetForModelMatrix() });
         
         mLayouts.insert({ utils::Hash(SAMPLER_LAYOUT_NAME), CreateDescriptorSetLayoutForSampler() });
         mDescriptorPools.insert({ utils::Hash(SAMPLER_LAYOUT_NAME), CreateDescriptorPoolForSampler() });
@@ -276,87 +277,154 @@ namespace vk
             throw std::runtime_error("Failed to create descriptor set layout!");
         }
         SET_NAME(descriptorSetLayout, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-             OBJECT_LAYOUT_NAME.c_str());
+             MODEL_MATRIX_LAYOUT_NAME.c_str());
         return descriptorSetLayout;
     }
     VkDescriptorPool DescriptorService::CreateDescriptorPoolForModelMatrix()
     {
-        const int number_of_buffers = MODEL_POOL_SIZE * MAX_FRAMES_IN_FLIGHT;
-        //Create the descriptor pool
-        VkDescriptorPoolSize objectPoolSize{};
-        objectPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        objectPoolSize.descriptorCount = number_of_buffers; // Example: support up to 100 objects
-        VkDescriptorPoolCreateInfo objectPoolInfo{};
-        objectPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        objectPoolInfo.poolSizeCount = 1;
-        objectPoolInfo.pPoolSizes = &objectPoolSize;
-        objectPoolInfo.maxSets = number_of_buffers;
+        VkDevice device = Device::gDevice->GetDevice();
+        ///Create the descriptor pool.Because we are using dynamic buffers we create
+        ///only one descriptor set per frame.
+        std::array<VkDescriptorPoolSize, 1> poolSizes{};
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        poolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;  // One descriptor for each frame in flight
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;  // Number of descriptor sets = number of frames in flight
         VkDescriptorPool descriptorPool;
-        if (vkCreateDescriptorPool(Device::gDevice->GetDevice(), &objectPoolInfo, 
-            nullptr, &descriptorPool) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create object descriptor pool!");
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create descriptor pool!");
         }
         SET_NAME(descriptorPool, VK_OBJECT_TYPE_DESCRIPTOR_POOL, "objectDescriptorPool");
         return descriptorPool;
     }
     const std::vector<VkDescriptorSet> DescriptorService::CreateDescriptorSetForModelMatrix()
     {
-        //alloc the buffers for the sets
-        VkDeviceSize bufferSize = sizeof(entities::ModelMatrixUniformBuffer);
+        const VkDevice device = Device::gDevice->GetDevice();
+        const VkPhysicalDevice physicalDevice = Instance::gInstance->GetPhysicalDevice();
+        const VkDescriptorSetLayout descriptorSetLayout = mLayouts.at(utils::Hash(MODEL_MATRIX_LAYOUT_NAME));
+        const VkDescriptorPool descriptorPool = mDescriptorPools.at(utils::Hash(MODEL_MATRIX_LAYOUT_NAME));
+        //Create the buffer
+        //1)Calculate the buffer size. Since i'm using dynamic uniform buffers, alignment matters
+        constexpr size_t modelDataSize = sizeof(entities::ModelMatrixUniformBuffer);
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+        const VkDeviceSize minUniformBufferOffsetAlignment = deviceProperties.limits.minUniformBufferOffsetAlignment;
+        const VkDeviceSize alignedModelDataSize = (modelDataSize + minUniformBufferOffsetAlignment - 1) & ~(minUniformBufferOffsetAlignment - 1);
+        const VkDeviceSize perFrameBufferSize = alignedModelDataSize * MAX_NUMBER_OF_OBJECTS;
+        const VkDeviceSize totalBufferSize = perFrameBufferSize * MAX_FRAMES_IN_FLIGHT;
+        //2)Create the buffer, it's memory and map to the base of the buffer.
         uintptr_t baseAddress;
-        DescriptorSetBuffer objBuffer = CreateBuffer(MAX_NUMBER_OF_OBJECTS,
-            sizeof(entities::ModelMatrixUniformBuffer),
+        DescriptorSetBuffer modelBuffer = CreateBuffer(1,
+            totalBufferSize,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, baseAddress);
-        mDescriptorSetBuffers.insert({ utils::Hash(OBJECT_LAYOUT_NAME), objBuffer });
-        mBaseAddesses.insert({ utils::Hash(OBJECT_LAYOUT_NAME), baseAddress });
-        auto bufferName = Concatenate(OBJECT_LAYOUT_NAME, "Buffer");
-        //name the buffer objects
-        SET_NAME(objBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, bufferName.c_str());
-        auto memoryName = Concatenate(OBJECT_LAYOUT_NAME, "Memory");
-        SET_NAME(objBuffer.mMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, memoryName.c_str());
-        //Build the descriptor sets
-        VkDescriptorSetLayout objDescriptorSetLayout = mLayouts[utils::Hash(OBJECT_LAYOUT_NAME)];
-        VkDescriptorPool cameraDescriptorPool = mDescriptorPools[utils::Hash(OBJECT_LAYOUT_NAME)];
-        std::vector<VkDescriptorSetLayout> layouts(MAX_NUMBER_OF_OBJECTS, objDescriptorSetLayout);
+        auto bufferName = Concatenate(MODEL_MATRIX_LAYOUT_NAME, "Buffer");
+        auto memoryName = Concatenate(MODEL_MATRIX_LAYOUT_NAME, "Memory");
+        SET_NAME(modelBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, bufferName.c_str());
+        SET_NAME(modelBuffer.mMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, memoryName.c_str());
+        //3)Create the descriptor sets
+        std::vector<VkDescriptorSet> descriptorSets(MAX_FRAMES_IN_FLIGHT);
+        std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, 
+            descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = cameraDescriptorPool;
-        allocInfo.descriptorSetCount = MAX_NUMBER_OF_OBJECTS;
+        allocInfo.descriptorPool = descriptorPool;  // The pool created earlier
+        allocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
         allocInfo.pSetLayouts = layouts.data();
-        std::vector<VkDescriptorSet> descriptorSets;
-        descriptorSets.resize(MAX_NUMBER_OF_OBJECTS);
-        if (vkAllocateDescriptorSets(Device::gDevice->GetDevice(), &allocInfo,
-            descriptorSets.data()) != VK_SUCCESS) {
-            throw std::runtime_error("failed to allocate descriptor sets for object model matrix!");
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate descriptor sets!");
         }
-        std::vector<std::uintptr_t> descriptorSetOffsets;
-        for (size_t i = 0; i < MAX_NUMBER_OF_OBJECTS; i++) {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = objBuffer.mBuffer;
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(entities::ModelMatrixUniformBuffer);
+            bufferInfo.buffer = modelBuffer.mBuffer;  // The buffer you created
+            bufferInfo.offset = 0;              // Dynamic offset will control the starting point
+            bufferInfo.range = alignedModelDataSize;  // This should be the aligned size of one ModelData
+
             VkWriteDescriptorSet descriptorWrite{};
             descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrite.dstSet = descriptorSets[i];
-            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstSet = descriptorSets[i];   // Descriptor set for the current frame
+            descriptorWrite.dstBinding = 0;               // Binding point in the shader
             descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.pBufferInfo = &bufferInfo;
-            vkUpdateDescriptorSets(Device::gDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
-            descriptorSetOffsets.push_back(sizeof(entities::ModelMatrixUniformBuffer) * i);
+
+            vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
         }
-        //store their offsets
-        mDescriptorSetsBuffersOffsets.insert({ utils::Hash(OBJECT_LAYOUT_NAME), descriptorSetOffsets });
-        //name the descriptor sets
-        int i = 0;
-        for (auto& ds : descriptorSets) {
-            auto n = Concatenate(OBJECT_LAYOUT_NAME.c_str(), "DescriptorSet", i);
-            SET_NAME(ds, VK_OBJECT_TYPE_DESCRIPTOR_SET, n.c_str());
-            i++;
+        //4)pre calculate the dynamic offsets
+        std::vector<std::uintptr_t> dynamicOffsets(MAX_NUMBER_OF_OBJECTS);
+        for (uint32_t i = 0; i < MAX_NUMBER_OF_OBJECTS; i++) {
+            dynamicOffsets[i] = i * alignedModelDataSize;
+        }
+        //5)fill the tables
+        mDescriptorSetBuffers.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), modelBuffer});
+        mBaseAddesses.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), baseAddress });
+        mDescriptorSetsBuffersOffsets.insert({ utils::Hash(MODEL_MATRIX_LAYOUT_NAME), 
+            dynamicOffsets });
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            auto name = Concatenate(MODEL_MATRIX_LAYOUT_NAME, "DescriptorSetForFrame", i);
+            SET_NAME(descriptorSets[i], VK_OBJECT_TYPE_DESCRIPTOR_SET, name.c_str());
         }
         return descriptorSets;
+        ////alloc the buffers for the sets
+        //VkDeviceSize bufferSize = sizeof(entities::ModelMatrixUniformBuffer);
+        //uintptr_t baseAddress;
+        //DescriptorSetBuffer objBuffer = CreateBuffer(MAX_NUMBER_OF_OBJECTS,
+        //    sizeof(entities::ModelMatrixUniformBuffer),
+        //    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        //    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, baseAddress);
+        //mDescriptorSetBuffers.insert({ utils::Hash(OBJECT_LAYOUT_NAME), objBuffer });
+        //mBaseAddesses.insert({ utils::Hash(OBJECT_LAYOUT_NAME), baseAddress });
+        //auto bufferName = Concatenate(OBJECT_LAYOUT_NAME, "Buffer");
+        ////name the buffer objects
+        //SET_NAME(objBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, bufferName.c_str());
+        //auto memoryName = Concatenate(OBJECT_LAYOUT_NAME, "Memory");
+        //SET_NAME(objBuffer.mMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, memoryName.c_str());
+        ////Build the descriptor sets
+        //VkDescriptorSetLayout objDescriptorSetLayout = mLayouts[utils::Hash(OBJECT_LAYOUT_NAME)];
+        //VkDescriptorPool cameraDescriptorPool = mDescriptorPools[utils::Hash(OBJECT_LAYOUT_NAME)];
+        //std::vector<VkDescriptorSetLayout> layouts(MAX_NUMBER_OF_OBJECTS, objDescriptorSetLayout);
+        //VkDescriptorSetAllocateInfo allocInfo{};
+        //allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        //allocInfo.descriptorPool = cameraDescriptorPool;
+        //allocInfo.descriptorSetCount = MAX_NUMBER_OF_OBJECTS;
+        //allocInfo.pSetLayouts = layouts.data();
+        //std::vector<VkDescriptorSet> descriptorSets;
+        //descriptorSets.resize(MAX_NUMBER_OF_OBJECTS);
+        //if (vkAllocateDescriptorSets(Device::gDevice->GetDevice(), &allocInfo,
+        //    descriptorSets.data()) != VK_SUCCESS) {
+        //    throw std::runtime_error("failed to allocate descriptor sets for object model matrix!");
+        //}
+        //std::vector<std::uintptr_t> descriptorSetOffsets;
+        //for (size_t i = 0; i < MAX_NUMBER_OF_OBJECTS; i++) {
+        //    VkDescriptorBufferInfo bufferInfo{};
+        //    bufferInfo.buffer = objBuffer.mBuffer;
+        //    bufferInfo.offset = 0;
+        //    bufferInfo.range = sizeof(entities::ModelMatrixUniformBuffer);
+        //    VkWriteDescriptorSet descriptorWrite{};
+        //    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        //    descriptorWrite.dstSet = descriptorSets[i];
+        //    descriptorWrite.dstBinding = 0;
+        //    descriptorWrite.dstArrayElement = 0;
+        //    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        //    descriptorWrite.descriptorCount = 1;
+        //    descriptorWrite.pBufferInfo = &bufferInfo;
+        //    vkUpdateDescriptorSets(Device::gDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
+        //    descriptorSetOffsets.push_back(sizeof(entities::ModelMatrixUniformBuffer) * i);
+        //}
+        ////store their offsets
+        //mDescriptorSetsBuffersOffsets.insert({ utils::Hash(OBJECT_LAYOUT_NAME), descriptorSetOffsets });
+        ////name the descriptor sets
+        //int i = 0;
+        //for (auto& ds : descriptorSets) {
+        //    auto n = Concatenate(OBJECT_LAYOUT_NAME.c_str(), "DescriptorSet", i);
+        //    SET_NAME(ds, VK_OBJECT_TYPE_DESCRIPTOR_SET, n.c_str());
+        //    i++;
+        //}
+        //return descriptorSets;
     }
     VkDescriptorSetLayout DescriptorService::CreateDescriptorSetLayoutForSampler()
     {

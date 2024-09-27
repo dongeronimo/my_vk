@@ -11,7 +11,7 @@ namespace vk
     const uint32_t MAX_NUMBER_OF_OBJECTS = 10000 * MAX_FRAMES_IN_FLIGHT;
     const uint32_t MAX_NUMBER_OF_CAMERAS = MAX_FRAMES_IN_FLIGHT;
     const std::string CAMERA_LAYOUT_NAME = "CameraDataDescriptorSet";
-    const std::string OBJECT_LAYOUT_NAME = "ModelMatrixDescriptorSet";
+    const std::string MODEL_MATRIX_LAYOUT_NAME = "ModelMatrixDescriptorSet";
     const std::string SAMPLER_LAYOUT_NAME = "SamplerDescriptorSet";
     /// <summary>
     /// Manages descriptor set layouts, descriptor pools and descriptor sets.
@@ -28,6 +28,7 @@ namespace vk
             uint32_t idx)const;
         std::vector<uintptr_t> DescriptorSetsBuffersAddrs(const std::string& name,
             uint32_t idx)const;
+        uintptr_t DescriptorSetDynamicOffset(const std::string& name, uint32_t idx);
     private:
         SamplerService& mSamplerService;
         struct DescriptorSetBuffer {
@@ -60,6 +61,9 @@ namespace vk
         /// Holds the buffer of each descriptor set
         /// </summary>
         std::map<size_t, DescriptorSetBuffer> mDescriptorSetBuffers;
+        /// <summary>
+        /// Store the addresses of the buffers or dynamic offsets, 
+        /// </summary>
         std::map<size_t, const std::vector<std::uintptr_t>> mDescriptorSetsBuffersOffsets;
         std::map<size_t, const uintptr_t> mBaseAddesses;
 
