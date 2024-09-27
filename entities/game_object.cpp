@@ -7,6 +7,7 @@
 #include <vk/debug_utils.h>
 #include "model_matrix_uniform_buffer.h"
 #include "camera_uniform_buffer.h"
+#include "vk\instance.h"
 /// <summary>
 /// List of available id for game objects. Its important because there's a limited number of possible
 /// game objects, limited by the number of descriptor sets in the pool and memory allocated on the 
@@ -62,17 +63,17 @@ namespace entities
         //bind the mesh.
         mMesh->Bind(cmdBuffer);
         //bind the descriptor sets
-        uint32_t cameraDynamicOffset = DynamicOffset<entities::CameraUniformBuffer>(currentFrame, 0);
+        uint32_t cameraDynamicOffset = DynamicOffset<entities::CameraUniformBuffer>(currentFrame, 0, vk::Instance::gInstance->GetPhysicalDevice());
         vkCmdBindDescriptorSets(
             cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipeline.PipelineLayout(),
             vk::CAMERA_SET,
             1,
             &mCameraDescriptorSet[currentFrame],
-            1,
-            &cameraDynamicOffset
+            0,
+            nullptr
         );
-        uint32_t modelMatrixDynamicOffset = DynamicOffset<entities::ModelMatrixUniformBuffer>(currentFrame, mId);
+        uint32_t modelMatrixDynamicOffset = DynamicOffset<entities::ModelMatrixUniformBuffer>(currentFrame, mId, vk::Instance::gInstance->GetPhysicalDevice());
         vkCmdBindDescriptorSets(
             cmdBuffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -80,8 +81,8 @@ namespace entities
             vk::MODEL_MATRIX_SET,                                  
             1,                                 
             &mModelMatrixDescriptorSet[currentFrame],               
-            1,
-            &modelMatrixDynamicOffset
+            0,
+            nullptr
         );
         //Draw command
         vkCmdDrawIndexed(cmdBuffer,

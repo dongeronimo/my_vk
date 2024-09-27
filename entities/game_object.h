@@ -10,8 +10,15 @@ namespace vk {
 }
 namespace entities {
     template<typename t>
-    uint32_t DynamicOffset(uint32_t currentFrame, uint32_t id) {
-        return id * MAX_FRAMES_IN_FLIGHT * sizeof(t) + currentFrame ;
+    uint32_t DynamicOffset(uint32_t currentFrame, uint32_t id, 
+        VkPhysicalDevice physicalDevice) {
+        size_t fooSize = sizeof(t);
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+        VkDeviceSize minAlignment = properties.limits.minUniformBufferOffsetAlignment;
+        VkDeviceSize alignedSize = (fooSize + minAlignment - 1) & ~(minAlignment - 1);
+        VkDeviceSize dynamicOffset = (currentFrame * MAX_FRAMES_IN_FLIGHT + id)*alignedSize;
+        return static_cast<uint32_t>(dynamicOffset);
     }
     class Mesh;
     class Pipeline;

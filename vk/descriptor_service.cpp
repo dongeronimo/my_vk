@@ -160,7 +160,7 @@ namespace vk
         VkDevice device = vk::Device::gDevice->GetDevice();
         VkDescriptorSetLayoutBinding cameraLayoutBinding{};
         cameraLayoutBinding.binding = 0;
-        cameraLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        cameraLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ;
         cameraLayoutBinding.descriptorCount = 1;
         cameraLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         cameraLayoutBinding.pImmutableSamplers = nullptr; // Optional
@@ -181,7 +181,7 @@ namespace vk
     {
         //camera descriptor pool - there will be only one camera
         VkDescriptorPoolSize cameraPoolSize{};
-        cameraPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        cameraPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         cameraPoolSize.descriptorCount = MAX_NUMBER_OF_CAMERAS;
 
         VkDescriptorPoolCreateInfo cameraPoolInfo{};
@@ -241,7 +241,7 @@ namespace vk
             descriptorWrite.dstSet = descriptorSets[i];
             descriptorWrite.dstBinding = 0;
             descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.pBufferInfo = &bufferInfo;
             vkUpdateDescriptorSets(Device::gDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
@@ -261,32 +261,30 @@ namespace vk
     VkDescriptorSetLayout DescriptorService::CreateDescriptorSetLayoutForObject()
     {
         VkDevice device = Device::gDevice->GetDevice();
-        VkDescriptorSetLayoutBinding objectLayoutBinding{};
-        objectLayoutBinding.binding = 0;
-        objectLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        objectLayoutBinding.descriptorCount = 1;
-        objectLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-        objectLayoutBinding.pImmutableSamplers = nullptr; // Optional
-
-        VkDescriptorSetLayoutCreateInfo objectLayoutInfo{};
-        objectLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        objectLayoutInfo.bindingCount = 1;
-        objectLayoutInfo.pBindings = &objectLayoutBinding;
-        VkDescriptorSetLayout layout;
-        if (vkCreateDescriptorSetLayout(device, &objectLayoutInfo,
-            nullptr, &layout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor set layout for object");
+        VkDescriptorSetLayoutBinding modelMatrixBinding{};
+        modelMatrixBinding.binding = 0;  // Will be the only resource in the set, so it's binding is 0
+        modelMatrixBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;  // Dynamic uniform buffer type
+        modelMatrixBinding.descriptorCount = 1;  // One descriptor for the model matrix buffer
+        modelMatrixBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;  // Used in the vertex shader
+        modelMatrixBinding.pImmutableSamplers = nullptr;  // Not using any immutable samplers
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;  // We have one binding (the dynamic uniform buffer)
+        layoutInfo.pBindings = &modelMatrixBinding;  // Pointer to the binding array
+        VkDescriptorSetLayout descriptorSetLayout;
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create descriptor set layout!");
         }
-        SET_NAME(layout, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+        SET_NAME(descriptorSetLayout, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
              OBJECT_LAYOUT_NAME.c_str());
-        return layout;
+        return descriptorSetLayout;
     }
     VkDescriptorPool DescriptorService::CreateDescriptorPoolForModelMatrix()
     {
         const int number_of_buffers = MODEL_POOL_SIZE * MAX_FRAMES_IN_FLIGHT;
         //Create the descriptor pool
         VkDescriptorPoolSize objectPoolSize{};
-        objectPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        objectPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         objectPoolSize.descriptorCount = number_of_buffers; // Example: support up to 100 objects
         VkDescriptorPoolCreateInfo objectPoolInfo{};
         objectPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -343,7 +341,7 @@ namespace vk
             descriptorWrite.dstSet = descriptorSets[i];
             descriptorWrite.dstBinding = 0;
             descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrite.descriptorCount = 1;
             descriptorWrite.pBufferInfo = &bufferInfo;
             vkUpdateDescriptorSets(Device::gDevice->GetDevice(), 1, &descriptorWrite, 0, nullptr);
