@@ -109,6 +109,7 @@ namespace entities
         }
         size_t Hash() { return mHash; }
         void Bind(VkCommandBuffer buffer);
+
         template<typename T>
         void SetPushConstant(const T& value, 
             uint32_t id, 

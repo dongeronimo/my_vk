@@ -107,14 +107,23 @@ int main(int argc, char** argv)
     auto gFoo = new entities::GameObject("foo", descriptorService,"demoPipeline", meshService.GetMesh("monkey.glb"));
     gFoo->SetPosition(glm::vec3( 0,0,0 ));
     gFoo->SetOrientation(glm::quat());
+    gFoo->OnDraw = [](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
+        if (pipeline.Hash() == utils::Hash("phongSolidColor")) {
+            entities::ColorPushConstantData color{ {0,1,0,1} };
+            pipeline.SetPushConstant<entities::ColorPushConstantData>(
+                color, go.mId, commandBuffer, VK_SHADER_STAGE_VERTEX_BIT
+            );
+        }
+        };
     gObjects.push_back(gFoo);
     auto gBar = new entities::GameObject("bar", descriptorService, "demoPipeline", meshService.GetMesh("monkey.glb"));
     gBar->SetPosition(glm::vec3(2, 0, 0));
     gBar->SetOrientation(glm::quat());
+
     gObjects.push_back(gBar);
     //add the game objects to their pipelines
-   // gPipelineGameObjectTable.insert({ utils::Hash("phongSolidColor"), {gFoo} });
-    gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar, gFoo}});
+    gPipelineGameObjectTable.insert({ phongSolidColor->Hash(), {gFoo}});
+    gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar}});
     //Define the camera
     entities::CameraUniformBuffer cameraBuffer;
     cameraBuffer.cameraPos = glm::vec3(5.0f, 5.0f, 5.0f);

@@ -62,6 +62,9 @@ namespace entities
     {
         vk::SetMark({ 1.0f, 0.8f, 1.0f, 1.0f }, mName, cmdBuffer);
         CopyModelMatrixToDescriptorSetMemory(currentFrame);
+        if (OnDraw ) {
+            (*OnDraw)(*this, pipeline, currentFrame, cmdBuffer);
+        }
         //bind the mesh.
         mMesh->Bind(cmdBuffer);
         //bind the descriptor sets

@@ -2,6 +2,8 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+#include <functional>
+#include <optional>
 #include <vulkan/vulkan.h>
 #include <glm/gtc/quaternion.hpp>
 #define MAX_NUMBER_OF_GAME_OBJECTS 10000
@@ -14,6 +16,7 @@ namespace entities {
     class Pipeline;
     class GameObject {
     public:
+        std::optional<std::function<void(GameObject&, Pipeline&, uint32_t, VkCommandBuffer)>> OnDraw;
         ~GameObject();
         GameObject(const std::string& name, 
             vk::DescriptorService& descriptorService,
