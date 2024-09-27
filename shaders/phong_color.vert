@@ -17,8 +17,11 @@ layout(location=1) in vec2 inUV0;
 layout(location=2) in vec3 inNormal;
 
 layout(location=0) out vec4 outColor;
-
+layout(location=1) out vec3 outFragPos;
+layout(location=2) out vec3 outNormal;
 void main() {
     outColor = colorPushConstant.color;
+    outFragPos = vec3(objectUniform.model * vec4(inPosition,1.0));
+    outNormal = mat3(transpose(inverse(objectUniform.model)) * inNormal;
     gl_Position = cameraUniform.proj * cameraUniform.view * objectUniform.model * vec4(inPosition, 1.0);
 }

@@ -33,6 +33,8 @@ std::map<renderpass_hash_t, std::vector<pipeline_hash_t>> gRenderPassPipelineTab
 /// Holds the render passes, on the order they are to be run
 /// </summary>
 std::vector<vk::RenderPass*> gOrderedRenderpasses;
+entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService);
+entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService);
 
 std::map<pipeline_hash_t, std::vector<entities::GameObject*>> gPipelineGameObjectTable;
 int main(int argc, char** argv)
@@ -63,39 +65,9 @@ int main(int argc, char** argv)
     //load meshes
     vk::MeshService meshService({ "monkey.glb" });
     //create the pipelines
-    entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline"))->
-        SetRenderPass(mainRenderPass)->
-        SetShaderModules(
-            entities::LoadShaderModule(device.GetDevice(), "demo.vert.spv"),
-            entities::LoadShaderModule(device.GetDevice(), "demo.frag.spv")
-        )->
-        SetDescriptorSetLayouts({
-            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
-            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME)})->
-        SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
-        SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
-        SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
-        SetColorBlending(entities::GetNoColorBlend())->
-        SetViewport(entities::GetViewportForSize(SCREEN_WIDTH,SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH,SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
-        Build();
+    entities::Pipeline* demoPipeline = CreateDemoPipeline(mainRenderPass, device, descriptorService);
 
-    //TODO phong: add depth
-    entities::Pipeline* phongSolidColor = (new entities::PipelineBuilder("phongSolidColor"))->
-        SetPushConstantRanges({ entities::GetPushConstantRangeFor<entities::ColorPushConstantData>(VK_SHADER_STAGE_VERTEX_BIT) })->
-        SetRenderPass(mainRenderPass)->
-        SetShaderModules(
-            entities::LoadShaderModule(device.GetDevice(), "phong_color.vert.spv"),
-            entities::LoadShaderModule(device.GetDevice(), "phong_color.frag.spv")
-        )->
-        SetDescriptorSetLayouts({ //TODO phong: add per-frag lightining data
-            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
-            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME) })->
-        SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
-        SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
-        SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
-        SetColorBlending(entities::GetNoColorBlend())->
-        SetViewport(entities::GetViewportForSize(SCREEN_WIDTH, SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH, SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
-        Build();
+    entities::Pipeline* phongSolidColor = CreatePhongSolidColorPipeline(mainRenderPass, device, descriptorService);  
 
     gPipelines.insert({ utils::Hash("phongSolidColor") , phongSolidColor });
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
@@ -199,4 +171,47 @@ int main(int argc, char** argv)
     ///begin the main loop - blocks here
     mainWindow.MainLoop();
     return 0;
+}
+
+
+entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService)
+{
+    //TODO phong: add depth
+    entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline"))->
+        SetRenderPass(renderPass)->
+        SetShaderModules(
+            entities::LoadShaderModule(device.GetDevice(), "demo.vert.spv"),
+            entities::LoadShaderModule(device.GetDevice(), "demo.frag.spv")
+        )->
+        SetDescriptorSetLayouts({
+            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
+            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME) })->
+            SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
+        SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
+        SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
+        SetColorBlending(entities::GetNoColorBlend())->
+        SetViewport(entities::GetViewportForSize(SCREEN_WIDTH, SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH, SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
+        Build();
+    return demoPipeline;
+}
+
+entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService) {
+    //TODO phong: add depth
+    entities::Pipeline* phongSolidColor = (new entities::PipelineBuilder("phongSolidColor"))->
+        SetPushConstantRanges({ entities::GetPushConstantRangeFor<entities::ColorPushConstantData>(VK_SHADER_STAGE_VERTEX_BIT) })->
+        SetRenderPass(renderPass)->
+        SetShaderModules(
+            entities::LoadShaderModule(device.GetDevice(), "phong_color.vert.spv"),
+            entities::LoadShaderModule(device.GetDevice(), "phong_color.frag.spv")
+        )->
+        SetDescriptorSetLayouts({ //TODO phong: add per-frag lightining data
+            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
+            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME) })->
+            SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
+        SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
+        SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
+        SetColorBlending(entities::GetNoColorBlend())->
+        SetViewport(entities::GetViewportForSize(SCREEN_WIDTH, SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH, SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
+        Build();
+    return phongSolidColor;
 }
