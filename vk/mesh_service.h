@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include "entities/mesh.h"
+#include "utils\hash.h"
 namespace vk
 {
     class MeshService {
@@ -12,6 +13,6 @@ namespace vk
         entities::Mesh* GetMesh(const std::string& n)const;
         ~MeshService();
     private:
-        std::map<size_t, entities::Mesh*> mMeshes;
+        std::map<hash_t, entities::Mesh*> mMeshes;
     };
 }

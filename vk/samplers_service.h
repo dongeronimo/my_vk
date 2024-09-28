@@ -14,7 +14,7 @@ namespace vk {
             return mSamplers.at(utils::Hash(name));
         }
     private:
-        std::map<size_t, VkSampler> mSamplers;
+        std::map<hash_t, VkSampler> mSamplers;
         
         VkSampler LinearRepeatNormalizedNonMipmap();
     };

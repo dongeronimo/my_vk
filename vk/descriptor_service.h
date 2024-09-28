@@ -5,7 +5,7 @@
 #include "utils/hash.h"
 namespace vk
 {
-    template<typename t>
+   template<typename t>
     VkDeviceSize CalculateAlignedSize() {
         constexpr size_t modelDataSize = sizeof(t);
         VkPhysicalDeviceProperties deviceProperties;
@@ -25,6 +25,7 @@ namespace vk
     class ImageService;
     const uint32_t CAMERA_SET = 0;
     const uint32_t MODEL_MATRIX_SET = 1;
+    const uint32_t LIGHT_SET = 2;
     const uint32_t MAX_NUMBER_OF_OBJECTS = 10000 * MAX_FRAMES_IN_FLIGHT;
     const uint32_t MAX_NUMBER_OF_CAMERAS = MAX_FRAMES_IN_FLIGHT;
     const std::string LIGHTNING_LAYOUT_NAME = "LightningDescriptorSet";
@@ -71,24 +72,24 @@ namespace vk
         /// <summary>
         /// Holds the descriptor set layouts;
         /// </summary>
-        std::map<size_t, VkDescriptorSetLayout> mLayouts;
+        std::map<hash_t, VkDescriptorSetLayout> mLayouts;
         /// <summary>
         /// Holds the descriptor pools
         /// </summary>
-        std::map<size_t, VkDescriptorPool> mDescriptorPools;
+        std::map<hash_t, VkDescriptorPool> mDescriptorPools;
         /// <summary>
         /// Holds the descriptor sets
         /// </summary>
-        std::map<size_t, const std::vector<VkDescriptorSet>> mDescriptorSets;
+        std::map<hash_t, const std::vector<VkDescriptorSet>> mDescriptorSets;
         /// <summary>
         /// Holds the buffer of each descriptor set
         /// </summary>
-        std::map<size_t, DescriptorSetBuffer> mDescriptorSetBuffers;
+        std::map<hash_t, DescriptorSetBuffer> mDescriptorSetBuffers;
         /// <summary>
         /// Store the addresses of the buffers or dynamic offsets, 
         /// </summary>
-        std::map<size_t, const std::vector<std::uintptr_t>> mDescriptorSetsBuffersOffsets;
-        std::map<size_t, const uintptr_t> mBaseAddesses;
+        std::map<hash_t, const std::vector<std::uintptr_t>> mDescriptorSetsBuffersOffsets;
+        std::map<hash_t, const uintptr_t> mBaseAddesses;
 
         VkDescriptorSetLayout CreateDescriptorSetLayoutForCamera();
         VkDescriptorPool CreateDescriptorPoolForCamera();

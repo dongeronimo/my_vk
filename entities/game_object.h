@@ -6,6 +6,7 @@
 #include <optional>
 #include <vulkan/vulkan.h>
 #include <glm/gtc/quaternion.hpp>
+#include "utils/hash.h"
 #define MAX_NUMBER_OF_GAME_OBJECTS 10000
 namespace vk {
     class DescriptorService;
@@ -32,7 +33,7 @@ namespace entities {
         glm::quat GetOrientation()const { return mOrientation; }
         const std::string mName;
         const uint32_t mId;
-        const size_t mPipelineHash;
+        const hash_t mPipelineHash;
         const std::string mPipelineName;
         void Draw(VkCommandBuffer cmdBuffer, 
             Pipeline& pipeline,

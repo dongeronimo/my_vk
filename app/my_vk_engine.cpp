@@ -17,10 +17,11 @@
 #include "app/timer.h"
 #include <entities/camera_uniform_buffer.h>
 #include "entities/frame.h"
+#include "entities/light_uniform_buffer.h"
 #include <algorithm>
 
-typedef size_t renderpass_hash_t;
-typedef size_t pipeline_hash_t;
+typedef hash_t renderpass_hash_t;
+typedef hash_t pipeline_hash_t;
 
 
 std::vector<entities::GameObject*> gObjects{};
@@ -34,7 +35,7 @@ std::map<renderpass_hash_t, std::vector<pipeline_hash_t>> gRenderPassPipelineTab
 /// </summary>
 std::vector<vk::RenderPass*> gOrderedRenderpasses;
 entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService);
-entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService);
+entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService,entities::TLightCallback lightCallback);
 
 std::map<pipeline_hash_t, std::vector<entities::GameObject*>> gPipelineGameObjectTable;
 int main(int argc, char** argv)
@@ -66,8 +67,15 @@ int main(int argc, char** argv)
     vk::MeshService meshService({ "monkey.glb" });
     //create the pipelines
     entities::Pipeline* demoPipeline = CreateDemoPipeline(mainRenderPass, device, descriptorService);
-
-    entities::Pipeline* phongSolidColor = CreatePhongSolidColorPipeline(mainRenderPass, device, descriptorService);  
+    entities::TLightCallback lightCallback = []() {
+        entities::LightBuffers lights;
+        memset(&lights, 0, sizeof(entities::LightBuffers));
+        lights.ambient.colorAndIntensity = { 1,1,1,0.1f };
+        lights.directionalLights.colorAndIntensity[0] = { 1,1,1,1 };
+        lights.directionalLights.direction[0] = { 1,0,0 };
+        return lights;
+    };
+    entities::Pipeline* phongSolidColor = CreatePhongSolidColorPipeline(mainRenderPass, device, descriptorService, lightCallback);  
 
     gPipelines.insert({ utils::Hash("phongSolidColor") , phongSolidColor });
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
@@ -111,6 +119,7 @@ int main(int argc, char** argv)
     uint32_t imageIndex = UINT32_MAX;
     std::vector<VkCommandBuffer> commandBuffers = device.CreateCommandBuffer("mainCommandBuffers", MAX_FRAMES_IN_FLIGHT);
 
+
     mainWindow.OnRender = [&timer, &syncService, &currentFrame, 
         &swapChain, &mainFramebuffer, &descriptorService, &cameraBuffer]
         (app::Window* w) 
@@ -131,7 +140,7 @@ int main(int argc, char** argv)
                 });
                 for (auto P : pipelines) {
                     // Bind the pipeline
-                    P->Bind(frame.CommandBuffer());
+                    P->Bind(frame.CommandBuffer(), frame.mCurrentFrame);
                     //set the camera data for the main render pass, all objects will use the same camera
                     std::vector<uintptr_t> cameraDescriptorSetsAddrs = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
                     void* cameraDescriptorSetAddr = reinterpret_cast<void*>(cameraDescriptorSetsAddrs[currentFrame]);
@@ -152,21 +161,6 @@ int main(int argc, char** argv)
             frame.EndFrame();
             currentFrame = currentFrame + 1;
             currentFrame = currentFrame % MAX_FRAMES_IN_FLIGHT;
-            ////set the camera data for the main render pass, all objects will use the same camera
-            //std::vector<uintptr_t> cameraDescriptorSetsAddrs = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
-            //void* cameraDescriptorSetAddr = reinterpret_cast<void*>(cameraDescriptorSetsAddrs[currentFrame]);
-            //memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
-            ////bind the pipeline
-            //auto pipeline = gPipelines.at(utils::Hash("demoPipeline"));
-            //pipeline->Bind(frame.CommandBuffer());
-            ////draw the objects
-            //for (auto& go : gObjects) {
-            //    go->Draw(frame.CommandBuffer(), *pipeline , currentFrame);
-            //}
-            //mainRenderPass.EndRenderPass(frame.CommandBuffer());
-            //frame.EndFrame();
-            //currentFrame = currentFrame + 1;
-            //currentFrame = currentFrame % MAX_FRAMES_IN_FLIGHT;
     };
     ///begin the main loop - blocks here
     mainWindow.MainLoop();
@@ -177,7 +171,7 @@ int main(int argc, char** argv)
 entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService)
 {
     //TODO phong: add depth
-    entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline"))->
+    entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline", descriptorService))->
         SetRenderPass(renderPass)->
         SetShaderModules(
             entities::LoadShaderModule(device.GetDevice(), "demo.vert.spv"),
@@ -195,9 +189,10 @@ entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& d
     return demoPipeline;
 }
 
-entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService) {
+entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService,
+    entities::TLightCallback lightCallback) {
     //TODO phong: add depth
-    entities::Pipeline* phongSolidColor = (new entities::PipelineBuilder("phongSolidColor"))->
+    entities::Pipeline* phongSolidColor = (new entities::PipelineBuilder("phongSolidColor", descriptorService))->
         SetPushConstantRanges({ entities::GetPushConstantRangeFor<entities::ColorPushConstantData>(VK_SHADER_STAGE_VERTEX_BIT) })->
         SetRenderPass(renderPass)->
         SetShaderModules(
@@ -212,6 +207,7 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
         SetColorBlending(entities::GetNoColorBlend())->
         SetViewport(entities::GetViewportForSize(SCREEN_WIDTH, SCREEN_HEIGH), entities::GetScissor(SCREEN_WIDTH, SCREEN_HEIGH))-> //TODO resize: hardcoded screen size
+        SetLightDataCallback(lightCallback)->
         Build();
     return phongSolidColor;
 }

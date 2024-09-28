@@ -3,6 +3,10 @@
 #include <vulkan\vulkan.h>
 #include <vector>
 #include <optional>
+#include <functional>
+#include <optional>
+#include "entities/light_uniform_buffer.h"
+#include "utils/hash.h"
 namespace vk {
     class DescriptorService;
     class RenderPass;
@@ -35,6 +39,13 @@ namespace entities
     VkPipelineColorBlendStateCreateInfo GetNoColorBlend();
     VkViewport GetViewportForSize(uint32_t w, uint32_t h);
     VkRect2D GetScissor(uint32_t w, uint32_t h);
+
+    struct LightBuffers {
+        AmbientLightUniformBuffer ambient;
+        DirectionalLightUniformBuffer directionalLights;
+    };
+
+    typedef std::function<LightBuffers()> TLightCallback;
     /// <summary>
     /// Load a shader from the compiled .spv to a shader module
     /// </summary>
@@ -54,7 +65,7 @@ namespace entities
     class PipelineBuilder
     {
     public:
-        PipelineBuilder(const std::string& name);
+        PipelineBuilder(const std::string& name, vk::DescriptorService& descriptorService);
         /// <summary>
         /// Necessary: all pipelines need to know it's render pass
         /// </summary>
@@ -90,6 +101,13 @@ namespace entities
         PipelineBuilder* SetRasterizerStateInfo(VkPipelineRasterizationStateCreateInfo info);
         PipelineBuilder* SetColorBlending(VkPipelineColorBlendStateCreateInfo info);
         PipelineBuilder* SetViewport(VkViewport vp, VkRect2D scissor);
+        /// <summary>
+        /// This callback is to provide light data for the pipeline. If the callback is defined then in Bind() 
+        /// it'll be called and the light data passed to the gpu.
+        /// </summary>
+        /// <param name="cbk"></param>
+        /// <returns></returns>
+        PipelineBuilder* SetLightDataCallback(TLightCallback cbk);
         Pipeline* Build();
     private:
         std::vector<VkPushConstantRange> mPushConstantRanges{};
@@ -102,13 +120,18 @@ namespace entities
     class Pipeline
     {
     public:
-        Pipeline();
+        Pipeline(vk::DescriptorService& descriptorService);
         ~Pipeline();
         VkPipelineLayout PipelineLayout()const {
             return mPipelineLayout;
         }
-        size_t Hash() { return mHash; }
-        void Bind(VkCommandBuffer buffer);
+        hash_t Hash() { return mHash; }
+        /// <summary>
+        /// Bind the pipeline and if it has lightning data callback set applies lightning data.
+        /// </summary>
+        /// <param name="buffer"></param>
+        /// <param name="currentFrame"></param>
+        void Bind(VkCommandBuffer buffer, uint32_t currentFrame);
 
         template<typename T>
         void SetPushConstant(const T& value, 
@@ -126,7 +149,9 @@ namespace entities
         }
         friend class PipelineBuilder;
     private:
-        size_t mHash;
+        vk::DescriptorService& mDescriptorService;
+        std::optional<TLightCallback> mLightDataCallback;
+        hash_t mHash;
         VkRect2D mScissor;
         VkViewport mViewport;
         VkPipelineColorBlendStateCreateInfo mColorBlending{};

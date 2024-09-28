@@ -26,6 +26,6 @@ namespace vk {
         }
     private:
         VkDeviceMemory mDeviceMemory = VK_NULL_HANDLE;
-        std::map<size_t, entities::Image> mImageTable;
+        std::map<hash_t, entities::Image> mImageTable;
     };
 }

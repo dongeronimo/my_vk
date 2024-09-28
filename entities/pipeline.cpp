@@ -42,7 +42,7 @@ namespace entities
         return shaderModule;
     }
     
-    Pipeline::Pipeline()
+    Pipeline::Pipeline(vk::DescriptorService& descriptorService):mDescriptorService(mDescriptorService)
     {
     }
 
@@ -55,10 +55,30 @@ namespace entities
         vkDestroyShaderModule(d, mVertexShader, nullptr);
     }
 
-    void Pipeline::Bind(VkCommandBuffer buffer)
+    void Pipeline::Bind(VkCommandBuffer buffer, uint32_t currentFrame)
     {
-        vkCmdBindPipeline(buffer,
-            VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+        
+        vkCmdBindPipeline(buffer,VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
+        if (mLightDataCallback) {
+            entities::LightBuffers lightBuffers = (*mLightDataCallback)();
+            //TODO light: copy the data to the gpu
+            uintptr_t ambientAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Ambient"), 0)[currentFrame];
+            uintptr_t directionalAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Directional"), 0)[currentFrame];
+            memcpy(reinterpret_cast<void*>(ambientAddr), &lightBuffers.ambient, sizeof(entities::AmbientLightUniformBuffer));
+            memcpy(reinterpret_cast<void*>(directionalAddr), &lightBuffers.directionalLights, sizeof(entities::DirectionalLightUniformBuffer));
+            //TODO light: bind the descriptor set for light
+            VkDescriptorSet descriptorSet = mDescriptorService.DescriptorSet(vk::LIGHTNING_LAYOUT_NAME)[currentFrame];
+            vkCmdBindDescriptorSets(
+                buffer,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                PipelineLayout(),
+                vk::LIGHT_SET,
+                1,
+                &descriptorSet,
+                0,
+                nullptr
+            );
+        }
     }
 
     void Pipeline::SetRenderPass(vk::RenderPass* rp)
@@ -72,10 +92,10 @@ namespace entities
         this->mFragmentShader = frag;
     }
 
-    PipelineBuilder::PipelineBuilder(const std::string& name)
+    PipelineBuilder::PipelineBuilder(const std::string& name, vk::DescriptorService& descriptorService)
         :mName(name)
     {
-        this->mPipeline = new Pipeline();
+        this->mPipeline = new Pipeline(descriptorService);
     }
 
     PipelineBuilder* PipelineBuilder::SetRenderPass(vk::RenderPass* rp)
@@ -130,6 +150,12 @@ namespace entities
     {
         mPipeline->mViewport = vp;
         mPipeline->mScissor = scissor;
+        return this;
+    }
+
+    PipelineBuilder* PipelineBuilder::SetLightDataCallback(TLightCallback cbk)
+    {
+        mPipeline->mLightDataCallback = cbk;
         return this;
     }
 

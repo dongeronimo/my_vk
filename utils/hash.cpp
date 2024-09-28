@@ -1,11 +1,19 @@
 #include "hash.h"
 #include <functional>
 std::hash<std::string> hash_str_fn;
-size_t utils::Hash(const char* s) {
+hash_t utils::Hash(const char* s) {
+#ifdef HASHED_KEYS
     std::string str(s);
     return utils::Hash(str);
+#else
+    return std::string(s);
+#endif
 }
-size_t utils::Hash(const std::string& s)
+hash_t utils::Hash(const std::string& s)
 {
+#ifdef HASHED_KEYS
     return hash_str_fn(s);
+#else
+    return s;
+#endif
 }

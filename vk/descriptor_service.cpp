@@ -552,7 +552,6 @@ namespace vk
         SET_NAME(ambientLightBuffer.mBuffer, VK_OBJECT_TYPE_BUFFER, ambientLightbufferName.c_str());
         SET_NAME(ambientLightBuffer.mMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, ambientLightmemoryName.c_str());
         //3)Create the descriptor sets
-        VkDescriptorSetLayout descriptorSetLayout = mLayouts.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
         std::vector<VkDescriptorSet> descriptorSets(MAX_FRAMES_IN_FLIGHT);
         std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
         VkDescriptorSetAllocateInfo allocInfo = {};
@@ -560,7 +559,6 @@ namespace vk
         allocInfo.descriptorPool = descriptorPool; // The descriptor pool you created
         allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
         allocInfo.pSetLayouts = layouts.data();
-        std::vector<VkDescriptorSet> descriptorSets(MAX_FRAMES_IN_FLIGHT);
         if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate descriptor sets!");
         }
