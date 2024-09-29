@@ -113,11 +113,13 @@ namespace vk
         assert(mDescriptorSets.count(hash) > 0);
         return mDescriptorSets.at(hash);
     }
-    std::vector<uintptr_t> DescriptorService::DescriptorSetsBuffersAddrs(const std::string& name, uint32_t idx) const
+    std::vector<uintptr_t> DescriptorService::DescriptorSetsBuffersAddrs(const std::string& name, 
+        uint32_t idx, bool alredyAddedBaseAddress) const
     {
         //Get the descriptor set bucket that i want
         auto hash = utils::Hash(name);
-        assert(mDescriptorSetsBuffersOffsets.count(hash) > 0);
+        auto x = mDescriptorSetsBuffersOffsets.count(hash);
+        assert(x > 0);
         auto allOffsets = mDescriptorSetsBuffersOffsets.at(hash);
         assert(idx * MAX_FRAMES_IN_FLIGHT < allOffsets.size());
      
@@ -125,7 +127,12 @@ namespace vk
         //now that only the descriptor set that i want
         std::vector<uintptr_t> slice(MAX_FRAMES_IN_FLIGHT);
         for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            slice[i] = allOffsets[idx * MAX_FRAMES_IN_FLIGHT + i] + baseAddress;
+            if (!alredyAddedBaseAddress) {
+                slice[i] = allOffsets[idx * MAX_FRAMES_IN_FLIGHT + i] + baseAddress;
+            }
+            else {
+                slice[i] = allOffsets[idx * MAX_FRAMES_IN_FLIGHT + i];
+            }
         }
         return slice;
     }
@@ -613,5 +620,6 @@ namespace vk
         mDescriptorSetBuffers.insert({ utils::Hash(directional_name), directionalLightBuffer });
         mBaseAddesses.insert({ utils::Hash(directional_name), directionalLightBaseAddress });
         mDescriptorSetsBuffersOffsets.insert({ utils::Hash(directional_name), directionalAddrs });
+        mDescriptorSets.insert({ utils::Hash(LIGHTNING_LAYOUT_NAME), descriptorSets });
     }
 }

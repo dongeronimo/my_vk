@@ -47,7 +47,7 @@ namespace vk
             uint32_t idx)const;
         std::vector<VkDescriptorSet> DescriptorSet(const std::string& name)const;
         std::vector<uintptr_t> DescriptorSetsBuffersAddrs(const std::string& name,
-            uint32_t idx)const;
+            uint32_t idx, bool alredyAddedBaseAddress = false)const;
         uintptr_t ModelMatrixDescriptorSetDynamicOffset( uint32_t idx);
 
         uintptr_t ModelMatrixBaseAddress() {

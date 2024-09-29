@@ -201,7 +201,8 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
         )->
         SetDescriptorSetLayouts({ //TODO phong: add per-frag lightining data
             descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
-            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME) })->
+            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME),
+            descriptorService.DescriptorSetLayout(vk::LIGHTNING_LAYOUT_NAME)})->
             SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
         SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->

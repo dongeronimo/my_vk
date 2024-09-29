@@ -42,7 +42,8 @@ namespace entities
         return shaderModule;
     }
     
-    Pipeline::Pipeline(vk::DescriptorService& descriptorService):mDescriptorService(mDescriptorService)
+    Pipeline::Pipeline(vk::DescriptorService& descriptorService):
+        mDescriptorService(descriptorService)
     {
     }
 
@@ -62,8 +63,8 @@ namespace entities
         if (mLightDataCallback) {
             entities::LightBuffers lightBuffers = (*mLightDataCallback)();
             //TODO light: copy the data to the gpu
-            uintptr_t ambientAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Ambient"), 0)[currentFrame];
-            uintptr_t directionalAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Directional"), 0)[currentFrame];
+            uintptr_t ambientAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Ambient"), 0, true)[currentFrame];
+            uintptr_t directionalAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Directional"), 0, true)[currentFrame];
             memcpy(reinterpret_cast<void*>(ambientAddr), &lightBuffers.ambient, sizeof(entities::AmbientLightUniformBuffer));
             memcpy(reinterpret_cast<void*>(directionalAddr), &lightBuffers.directionalLights, sizeof(entities::DirectionalLightUniformBuffer));
             //TODO light: bind the descriptor set for light
