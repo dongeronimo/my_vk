@@ -609,7 +609,7 @@ namespace vk
             uintptr_t currAmbientOffset = ambientLightSize * i;
             ambientAddrs.push_back(currAmbientOffset);
             uintptr_t currDirectionalOffset = directionalLightSize * i;
-            directionalAddrs.push_back(currAmbientOffset);
+            directionalAddrs.push_back(currDirectionalOffset);
         }
         //5) save to the tables
         auto ambient_name = Concatenate(LIGHTNING_LAYOUT_NAME, "Ambient");

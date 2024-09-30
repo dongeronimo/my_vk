@@ -80,7 +80,7 @@ int main(int argc, char** argv)
         entities::LightBuffers lights;
         memset(&lights, 0, sizeof(entities::LightBuffers));
         lights.ambient.colorAndIntensity = { 1,1,1,0.1f };
-        lights.directionalLights.colorAndIntensity[0] = { 1,1,1,2 };
+        lights.directionalLights.colorAndIntensity[0] = { 1,1,1,1 };
         lights.directionalLights.direction[0] = { 0,0,-1 };
         return lights;
     };
