@@ -57,16 +57,13 @@ int main(int argc, char** argv)
     //create the framebuffer for onscreen rendering
 
     ///Creates the depth buffers for the main framebuffer, one per frame
-    std::array<vk::DepthBuffer*, MAX_FRAMES_IN_FLIGHT> depthBuffersForMainFramebuffer;
+    std::vector< vk::DepthBuffer*> depthBuffers(MAX_FRAMES_IN_FLIGHT);
+    std::vector<VkImageView> depthBuffersImageViews(MAX_FRAMES_IN_FLIGHT);
     for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        depthBuffersForMainFramebuffer[i] = new vk::DepthBuffer(swapChain.GetExtent().width, swapChain.GetExtent().height);
+        depthBuffers[i] = new vk::DepthBuffer(swapChain.GetExtent().width, swapChain.GetExtent().height);
+        depthBuffersImageViews[i] = depthBuffers[i]->GetImageView();
     }
-    std::vector<VkImageView> depthBufferForMainFramebufferImageViews(depthBuffersForMainFramebuffer.size());
-    std::transform(depthBuffersForMainFramebuffer.begin(), depthBuffersForMainFramebuffer.end(),
-        depthBufferForMainFramebufferImageViews.begin(), [](vk::DepthBuffer* db) {
-            return db->GetImageView();
-        });
-    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(),depthBufferForMainFramebufferImageViews, 
+    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), depthBuffersImageViews,
         swapChain.GetExtent(), *mainRenderPass, "mainFramebuffer");
     //create the samplers
     vk::SamplerService samplersService;
@@ -83,8 +80,8 @@ int main(int argc, char** argv)
         entities::LightBuffers lights;
         memset(&lights, 0, sizeof(entities::LightBuffers));
         lights.ambient.colorAndIntensity = { 1,1,1,0.1f };
-        lights.directionalLights.colorAndIntensity[0] = { 1,1,1,1 };
-        lights.directionalLights.direction[0] = { 1,0,0 };
+        lights.directionalLights.colorAndIntensity[0] = { 1,1,1,2 };
+        lights.directionalLights.direction[0] = { 0,0,-1 };
         return lights;
     };
     entities::Pipeline* phongSolidColor = CreatePhongSolidColorPipeline(mainRenderPass, device, descriptorService, lightCallback);  
@@ -122,7 +119,7 @@ int main(int argc, char** argv)
     cameraBuffer.view = glm::lookAt(cameraBuffer.cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     //some perspective projection
     cameraBuffer.proj = glm::perspective(glm::radians(45.0f),
-        swapChain.GetExtent().width / (float)swapChain.GetExtent().height, 0.1f, 100.0f);
+        swapChain.GetExtent().width / (float)swapChain.GetExtent().height, 0.01f, 500.0f);
     //GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
     cameraBuffer.proj[1][1] *= -1;
     //define the main loop callback

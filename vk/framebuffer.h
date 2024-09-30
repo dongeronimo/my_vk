@@ -8,7 +8,7 @@ namespace vk
     class Framebuffer {
     public:
         Framebuffer(std::vector<VkImageView> colorAttachments, 
-            std::vector<VkImageView> depthAttachments,
+            std::vector<VkImageView> depthAttachment,
             VkExtent2D size,
             RenderPass& renderPass,
             const std::string& name);
