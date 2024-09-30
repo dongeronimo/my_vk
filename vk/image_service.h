@@ -8,6 +8,10 @@
 namespace vk {
     class ImageService {
     public:
+        static VkImageView CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+        static void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+            VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+            VkImage& image, VkDeviceMemory& imageMemory);
         static VkImage CreateImage(VkDevice device, uint32_t w, uint32_t h, VkFormat format,
             VkImageUsageFlags usage);
         static uint32_t FindMemoryTypesCompatibleWithAllImages(

@@ -19,6 +19,7 @@
 #include "entities/frame.h"
 #include "entities/light_uniform_buffer.h"
 #include <algorithm>
+#include <vk\depth_buffer.h>
 
 typedef hash_t renderpass_hash_t;
 typedef hash_t pipeline_hash_t;
@@ -51,11 +52,22 @@ int main(int argc, char** argv)
     vk::SwapChain swapChain;
     //create the render pass for onscreen rendering
     //TODO depth buffer - remeber that we have a version that uses depth buffer.
-    vk::RenderPass* mainRenderPass = new vk::RenderPass( swapChain.GetFormat(), "mainRenderPass");
+    vk::RenderPass* mainRenderPass = new vk::RenderPass(utils::FindDepthFormat(instance.GetPhysicalDevice()), swapChain.GetFormat(),"mainRenderPass");
     gOrderedRenderpasses.push_back(mainRenderPass);
     //create the framebuffer for onscreen rendering
-    //TODO depth buffer - no depth buffer, need to add one
-    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), swapChain.GetExtent(), *mainRenderPass, "mainFramebuffer");
+
+    ///Creates the depth buffers for the main framebuffer, one per frame
+    std::array<vk::DepthBuffer*, MAX_FRAMES_IN_FLIGHT> depthBuffersForMainFramebuffer;
+    for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        depthBuffersForMainFramebuffer[i] = new vk::DepthBuffer(swapChain.GetExtent().width, swapChain.GetExtent().height);
+    }
+    std::vector<VkImageView> depthBufferForMainFramebufferImageViews(depthBuffersForMainFramebuffer.size());
+    std::transform(depthBuffersForMainFramebuffer.begin(), depthBuffersForMainFramebuffer.end(),
+        depthBufferForMainFramebufferImageViews.begin(), [](vk::DepthBuffer* db) {
+            return db->GetImageView();
+        });
+    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(),depthBufferForMainFramebufferImageViews, 
+        swapChain.GetExtent(), *mainRenderPass, "mainFramebuffer");
     //create the samplers
     vk::SamplerService samplersService;
     //create the images
@@ -129,7 +141,7 @@ int main(int argc, char** argv)
             frame.BeginFrame();
             for (auto R : gOrderedRenderpasses) {
                 //for each render pass R begin R
-                R->BeginRenderPass({ 1,1,1,1 }, { 1.0f, 0 },
+                R->BeginRenderPass({ 0,0,0,1 }, { 1.0f, 0 },
                     mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH },
                     frame.CommandBuffer());
                 //for each pipeline P of R bind P

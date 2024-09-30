@@ -9,4 +9,7 @@ namespace utils {
     void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
         VkMemoryPropertyFlags properties, VkBuffer& buffer,
         VkDeviceMemory& bufferMemory);
+
+    void TransitionImageLayout(VkImage image, VkFormat format,
+        VkImageLayout oldLayout, VkImageLayout newLayout);
 }

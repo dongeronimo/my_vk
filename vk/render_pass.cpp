@@ -5,6 +5,7 @@
 namespace vk {
     RenderPass::RenderPass(VkFormat colorFormat, const std::string& name):mName(name)
     {
+        assert(mName.size() > 0);
         //the image that'll hold the result
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = colorFormat;
@@ -51,8 +52,10 @@ namespace vk {
         SET_NAME(mRenderPass, VK_OBJECT_TYPE_RENDER_PASS, name.c_str());
     }
     RenderPass::RenderPass(VkFormat depthFormat, VkFormat colorFormat,
-        const std::string& name)
+        const std::string& name):
+        mName(name)
     {
+        assert(mName.size() > 0);
         VkAttachmentDescription depthAttachment{};
         depthAttachment.format = depthFormat;
         depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
