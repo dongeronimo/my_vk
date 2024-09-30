@@ -537,8 +537,8 @@ namespace vk
         const VkDescriptorSetLayout descriptorSetLayout = mLayouts.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
         const VkDescriptorPool descriptorPool = mDescriptorPools.at(utils::Hash(LIGHTNING_LAYOUT_NAME));
         //1) Calculate the buffers sizes
-        const VkDeviceSize directionalLightSize = vk::CalculateAlignedSize<entities::DirectionalLightUniformBuffer>() * MAX_FRAMES_IN_FLIGHT;
-        const VkDeviceSize ambientLightSize = vk::CalculateAlignedSize<entities::AmbientLightUniformBuffer>() * MAX_FRAMES_IN_FLIGHT;
+        const VkDeviceSize directionalLightSize = sizeof(entities::DirectionalLightUniformBuffer) * MAX_FRAMES_IN_FLIGHT;
+        const VkDeviceSize ambientLightSize = sizeof(entities::AmbientLightUniformBuffer) * MAX_FRAMES_IN_FLIGHT;
         //2) Create the buffers, their memories and maps
         uintptr_t directionalLightBaseAddress;
         DescriptorSetBuffer directionalLightBuffer = CreateBuffer(1,
@@ -606,9 +606,9 @@ namespace vk
         std::vector<uintptr_t> ambientAddrs;
         std::vector<uintptr_t> directionalAddrs;
         for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            uintptr_t currAmbientOffset = ambientLightBaseAddress + ambientLightSize * i;
+            uintptr_t currAmbientOffset = ambientLightSize * i;
             ambientAddrs.push_back(currAmbientOffset);
-            uintptr_t currDirectionalOffset = directionalLightBaseAddress + directionalLightSize * i;
+            uintptr_t currDirectionalOffset = directionalLightSize * i;
             directionalAddrs.push_back(currAmbientOffset);
         }
         //5) save to the tables
