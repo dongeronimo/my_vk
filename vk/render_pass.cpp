@@ -3,7 +3,51 @@
 #include "device.h"
 #include "debug_utils.h"
 namespace vk {
-    RenderPass::RenderPass(VkFormat colorFormat, const std::string& name):mName(name)
+    RenderPass* RenderPass::RenderPassForShadowMapping(const std::string& name)
+    {
+        VkDevice device = vk::Device::gDevice->GetDevice();
+        assert(name.size() > 0);
+        VkAttachmentDescription depthAttachment = {};
+        depthAttachment.format = VK_FORMAT_D32_SFLOAT;  // e.g., VK_FORMAT_D32_SFLOAT
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;  // Typically no MSAA for shadow maps
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;  // Clear depth at start
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;  // Store depth for later sampling
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // No stencil use
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Starting layout
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;  // To be sampled later
+        VkAttachmentReference depthAttachmentRef = {};
+        depthAttachmentRef.attachment = 0;  // Index of the depth attachment
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;  // Layout for depth writing
+        VkSubpassDescription subpass = {};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 0;  // No color attachments
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;  // Depth attachment reference
+        VkSubpassDependency dependency = {};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;  // This subpass
+        dependency.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        dependency.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+        VkRenderPassCreateInfo renderPassInfo = {};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = 1;  // Just the depth attachment
+        renderPassInfo.pAttachments = &depthAttachment;
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
+        RenderPass* renderPass = new RenderPass(name);
+        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass->mRenderPass) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create shadow map render pass!");
+        }
+        SET_NAME(renderPass->mRenderPass, VK_OBJECT_TYPE_RENDER_PASS, name.c_str());
+        return renderPass;
+    }
+    RenderPass::RenderPass(VkFormat colorFormat, const std::string& name,
+        VkImageLayout finalLayout):mName(name)
     {
         assert(mName.size() > 0);
         //the image that'll hold the result
@@ -15,7 +59,7 @@ namespace vk {
         colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;//not using the stencil buffer
         colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;//image presented in the swap chain
+        colorAttachment.finalLayout = finalLayout;//image presented in the swap chain
         //the reference to the image attachment that'll hold the result
         VkAttachmentReference colorAttachmentRef{};
         colorAttachmentRef.attachment = 0;
@@ -143,4 +187,5 @@ namespace vk {
         vkDestroyRenderPass(vk::Device::gDevice->GetDevice(),
             mRenderPass, nullptr);
     }
+
 }

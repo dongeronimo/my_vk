@@ -62,12 +62,10 @@ namespace entities
         vkCmdBindPipeline(buffer,VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
         if (mLightDataCallback) {
             entities::LightBuffers lightBuffers = (*mLightDataCallback)();
-            //TODO light: copy the data to the gpu
             uintptr_t ambientAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Ambient"), 0)[currentFrame];
             uintptr_t directionalAddr = mDescriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Directional"), 0)[currentFrame];
             memcpy(reinterpret_cast<void*>(ambientAddr), &lightBuffers.ambient, sizeof(entities::AmbientLightUniformBuffer));
             memcpy(reinterpret_cast<void*>(directionalAddr), &lightBuffers.directionalLights, sizeof(entities::DirectionalLightUniformBuffer));
-            //TODO light: bind the descriptor set for light
             VkDescriptorSet descriptorSet = mDescriptorService.DescriptorSet(vk::LIGHTNING_LAYOUT_NAME)[currentFrame];
             vkCmdBindDescriptorSets(
                 buffer,

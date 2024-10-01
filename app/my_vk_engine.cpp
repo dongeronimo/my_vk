@@ -23,7 +23,8 @@
 
 typedef hash_t renderpass_hash_t;
 typedef hash_t pipeline_hash_t;
-
+const uint32_t SHADOW_MAP_WIDTH = 512;
+const uint32_t SHADOW_MAP_HEIGHT = 512;
 
 std::vector<entities::GameObject*> gObjects{};
 std::map<pipeline_hash_t, entities::Pipeline*> gPipelines;
@@ -51,11 +52,12 @@ int main(int argc, char** argv)
     //Create the swap chain
     vk::SwapChain swapChain;
     //create the render pass for onscreen rendering
-    //TODO depth buffer - remeber that we have a version that uses depth buffer.
     vk::RenderPass* mainRenderPass = new vk::RenderPass(utils::FindDepthFormat(instance.GetPhysicalDevice()), swapChain.GetFormat(),"mainRenderPass");
+    //Create the render pass for shadow mapping
+    vk::RenderPass* shadowMappingRenderPass = vk::RenderPass::RenderPassForShadowMapping("shadowMapRenderPass");
+    gOrderedRenderpasses.push_back(shadowMappingRenderPass);
     gOrderedRenderpasses.push_back(mainRenderPass);
     //create the framebuffer for onscreen rendering
-
     ///Creates the depth buffers for the main framebuffer, one per frame
     std::vector< vk::DepthBuffer*> depthBuffers(MAX_FRAMES_IN_FLIGHT);
     std::vector<VkImageView> depthBuffersImageViews(MAX_FRAMES_IN_FLIGHT);
@@ -65,6 +67,18 @@ int main(int argc, char** argv)
     }
     vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), depthBuffersImageViews,
         swapChain.GetExtent(), *mainRenderPass, "mainFramebuffer");
+    /////////Create the framebuffer for shadow mapping
+    //First, create the buffers
+    std::vector<vk::DepthBuffer*> depthBuffersForShadowMapping(MAX_FRAMES_IN_FLIGHT);
+    std::vector<VkImageView> imageViewsForShadowMapping(MAX_FRAMES_IN_FLIGHT);
+    for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        depthBuffersForShadowMapping[i] = new vk::DepthBuffer(SHADOW_MAP_WIDTH,
+            SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT);
+        imageViewsForShadowMapping[i] = depthBuffersForShadowMapping[i]->GetImageView();
+    }
+    //Then create the framebuffer
+    vk::Framebuffer shadowMapFramebuffer(imageViewsForShadowMapping, { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT }, *shadowMappingRenderPass, "shadowMapFrameBuffer");
+    ////////////////////
     //create the samplers
     vk::SamplerService samplersService;
     //create the images
@@ -80,7 +94,7 @@ int main(int argc, char** argv)
         entities::LightBuffers lights;
         memset(&lights, 0, sizeof(entities::LightBuffers));
         lights.ambient.colorAndIntensity = { 1,1,1,0.1f };
-        lights.directionalLights.colorAndIntensity[0] = { 1,1,1,1 };
+        lights.directionalLights.diffuseColorAndIntensity[0] = { 1,1,1,1 };
         lights.directionalLights.direction[0] = { 0,0,-1 };
         return lights;
     };
@@ -115,7 +129,7 @@ int main(int argc, char** argv)
     gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar}});
     //Define the camera
     entities::CameraUniformBuffer cameraBuffer;
-    cameraBuffer.cameraPos = glm::vec3(5.0f, 5.0f, 5.0f);
+    cameraBuffer.cameraPos = glm::vec3(-5.0f, -5.0f, 5.0f);
     cameraBuffer.view = glm::lookAt(cameraBuffer.cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     //some perspective projection
     cameraBuffer.proj = glm::perspective(glm::radians(45.0f),
@@ -179,7 +193,6 @@ int main(int argc, char** argv)
 
 entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService)
 {
-    //TODO phong: add depth
     entities::Pipeline* demoPipeline = (new entities::PipelineBuilder("demoPipeline", descriptorService))->
         SetRenderPass(renderPass)->
         SetShaderModules(
@@ -200,7 +213,6 @@ entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& d
 
 entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService,
     entities::TLightCallback lightCallback) {
-    //TODO phong: add depth
     entities::Pipeline* phongSolidColor = (new entities::PipelineBuilder("phongSolidColor", descriptorService))->
         SetPushConstantRanges({ entities::GetPushConstantRangeFor<entities::ColorPushConstantData>(VK_SHADER_STAGE_VERTEX_BIT) })->
         SetRenderPass(renderPass)->
@@ -208,7 +220,7 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
             entities::LoadShaderModule(device.GetDevice(), "phong_color.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "phong_color.frag.spv")
         )->
-        SetDescriptorSetLayouts({ //TODO phong: add per-frag lightining data
+        SetDescriptorSetLayouts({ 
             descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
             descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME),
             descriptorService.DescriptorSetLayout(vk::LIGHTNING_LAYOUT_NAME)})->

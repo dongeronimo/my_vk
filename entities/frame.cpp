@@ -5,12 +5,7 @@
 #include <vk/swap_chain.h>
 #include <vk/synchronization_service.h>
 //TODO frame: remember to free this
-
 static std::vector<VkCommandBuffer> commandBuffers;
-//static std::vector<VkSemaphore> imageAvailableSemaphores;
-//static std::vector<VkSemaphore> renderFinishedSemaphores;
-//static std::vector<VkFence> inFlightFences;
-
 
 namespace entities
 {

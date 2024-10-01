@@ -3,6 +3,7 @@
 namespace vk {
     class DepthBuffer {
     public:
+        DepthBuffer(uint32_t w, uint32_t h, VkFormat format);
         DepthBuffer(uint32_t w, uint32_t h);
         ~DepthBuffer();
         VkImageView GetImageView()const;
