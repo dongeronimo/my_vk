@@ -36,9 +36,11 @@ std::map<renderpass_hash_t, std::vector<pipeline_hash_t>> gRenderPassPipelineTab
 /// Holds the render passes, on the order they are to be run
 /// </summary>
 std::vector<vk::RenderPass*> gOrderedRenderpasses;
+
+
 entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService);
 entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService,entities::TLightCallback lightCallback);
-
+entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService, uint32_t w, uint32_t h);
 std::map<pipeline_hash_t, std::vector<entities::GameObject*>> gPipelineGameObjectTable;
 int main(int argc, char** argv)
 {
@@ -77,7 +79,10 @@ int main(int argc, char** argv)
         imageViewsForShadowMapping[i] = depthBuffersForShadowMapping[i]->GetImageView();
     }
     //Then create the framebuffer
-    vk::Framebuffer shadowMapFramebuffer(imageViewsForShadowMapping, { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT }, *shadowMappingRenderPass, "shadowMapFrameBuffer");
+    vk::Framebuffer shadowMapFramebuffer(imageViewsForShadowMapping, 
+        { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT }, 
+        *shadowMappingRenderPass, "shadowMapFrameBuffer");
+
     ////////////////////
     //create the samplers
     vk::SamplerService samplersService;
@@ -87,7 +92,7 @@ int main(int argc, char** argv)
     vk::DescriptorService descriptorService(samplersService,
         imageService);
     //load meshes
-    vk::MeshService meshService({ "monkey.glb" });
+    vk::MeshService meshService({ "monkey.glb", "4x4tile.glb"});
     //create the pipelines
     entities::Pipeline* demoPipeline = CreateDemoPipeline(mainRenderPass, device, descriptorService);
     entities::TLightCallback lightCallback = []() {
@@ -99,16 +104,19 @@ int main(int argc, char** argv)
         return lights;
     };
     entities::Pipeline* phongSolidColor = CreatePhongSolidColorPipeline(mainRenderPass, device, descriptorService, lightCallback);  
-
+    entities::Pipeline* shadowMapPipeline = CreateShadowMapPipeline(
+        shadowMappingRenderPass, device, descriptorService, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
     gPipelines.insert({ utils::Hash("phongSolidColor") , phongSolidColor });
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
+    gPipelines.insert({ utils::Hash("shadowMapPipeline"), shadowMapPipeline });
     //register that mainRenderPass has these pipelines
     gRenderPassPipelineTable.insert({ utils::Hash("mainRenderPass"), {utils::Hash("phongSolidColor"),  utils::Hash("demoPipeline")} });
+    gRenderPassPipelineTable.insert({ utils::Hash("shadowMapRenderPass"), {utils::Hash("shadowMapPipeline")} });
     //create the synchronization objects
     vk::SyncronizationService syncService;
     //Create a game object
     auto gFoo = new entities::GameObject("foo", descriptorService,"demoPipeline", meshService.GetMesh("monkey.glb"));
-    gFoo->SetPosition(glm::vec3( 0,0,0 ));
+    gFoo->SetPosition(glm::vec3( 0,4,0 ));
     gFoo->SetOrientation(glm::quat());
     gFoo->OnDraw = [](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
         if (pipeline.Hash() == utils::Hash("phongSolidColor")) {
@@ -120,7 +128,7 @@ int main(int argc, char** argv)
         };
     gObjects.push_back(gFoo);
     auto gBar = new entities::GameObject("bar", descriptorService, "demoPipeline", meshService.GetMesh("monkey.glb"));
-    gBar->SetPosition(glm::vec3(2, 0, 0));
+    gBar->SetPosition(glm::vec3(2, 4, 0));
     gBar->SetOrientation(glm::quat());
 
     gObjects.push_back(gBar);
@@ -129,7 +137,7 @@ int main(int argc, char** argv)
     gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar}});
     //Define the camera
     entities::CameraUniformBuffer cameraBuffer;
-    cameraBuffer.cameraPos = glm::vec3(-5.0f, -5.0f, 5.0f);
+    cameraBuffer.cameraPos = glm::vec3(-7.0f, -5.0f, 7.0f);
     cameraBuffer.view = glm::lookAt(cameraBuffer.cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     //some perspective projection
     cameraBuffer.proj = glm::perspective(glm::radians(45.0f),
@@ -144,17 +152,26 @@ int main(int argc, char** argv)
 
 
     mainWindow.OnRender = [&timer, &syncService, &currentFrame, 
-        &swapChain, &mainFramebuffer, &descriptorService, &cameraBuffer]
+        &swapChain, &mainFramebuffer,&shadowMapFramebuffer, &descriptorService, &cameraBuffer]
         (app::Window* w) 
         {
             timer.Advance();//advance the clock
             entities::Frame frame(currentFrame, syncService, swapChain);
             frame.BeginFrame();
             for (auto R : gOrderedRenderpasses) {
-                //for each render pass R begin R
-                R->BeginRenderPass({ 0,0,0,1 }, { 1.0f, 0 },
-                    mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH },
-                    frame.CommandBuffer());
+                //for each render pass R begin R, but remember that there are many different types of framebuffers
+                //and we must use the one compatible with the render pass.
+                //TODO optization: string comparison is bad. Use some kind of id or hash
+                if (mainFramebuffer.mRenderPass.mName == R->mName) {
+                    R->BeginRenderPass({ 0,0,0,1 }, { 1.0f, 0 },
+                        mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH },
+                        frame.CommandBuffer());
+                }
+                if (shadowMapFramebuffer.mRenderPass.mName == R->mName) {
+                    R->BeginRenderPass({ 0,0,0,1 }, { 1.0f, 0 },
+                        shadowMapFramebuffer.GetFramebuffer(frame.ImageIndex()), { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT},
+                        frame.CommandBuffer());
+                }
                 //for each pipeline P of R bind P
                 std::vector<pipeline_hash_t> pipelineHashes = gRenderPassPipelineTable.at(utils::Hash(R->mName));
                 std::vector<entities::Pipeline*> pipelines(pipelineHashes.size());
@@ -202,7 +219,7 @@ entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& d
         SetDescriptorSetLayouts({
             descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
             descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME) })->
-            SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
+        SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
         SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
         SetColorBlending(entities::GetNoColorBlend())->
@@ -232,4 +249,24 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
         SetLightDataCallback(lightCallback)->
         Build();
     return phongSolidColor;
+}
+
+entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService, uint32_t w, uint32_t h)
+{
+    entities::Pipeline* p = (new entities::PipelineBuilder("shadowMapPipeline", descriptorService))->
+        SetRenderPass(renderPass)->
+        SetShaderModules(
+            entities::LoadShaderModule(device.GetDevice(), "shadow_map.vert.spv"),
+            entities::LoadShaderModule(device.GetDevice(), "shadow_map.frag.spv"))
+        ->SetDescriptorSetLayouts({
+            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
+            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME)})->
+        SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
+        SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
+        SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
+        SetColorBlending(entities::GetNoColorBlend())->
+        SetViewport(entities::GetViewportForSize(w, h), entities::GetScissor(w, h))->
+        //...
+        Build();
+    return p;
 }

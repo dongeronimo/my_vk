@@ -16,6 +16,7 @@ namespace vk
             VkExtent2D size,
             RenderPass& renderPass,
             const std::string& name);
+        RenderPass& mRenderPass;
         const std::string mName;
         VkFramebuffer& GetFramebuffer(uint32_t idx)  {
             return mFramebuffers[idx];

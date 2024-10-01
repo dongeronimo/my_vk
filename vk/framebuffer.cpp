@@ -10,7 +10,7 @@ namespace vk
         std::vector<VkImageView> depthAttachments,
         VkExtent2D size, 
         RenderPass& renderPass, 
-        const std::string& name): mName(name)
+        const std::string& name): mName(name), mRenderPass(renderPass)
     {
         assert(colorAttachments.size() != 0);
 
@@ -39,7 +39,7 @@ namespace vk
         }
     }
     Framebuffer::Framebuffer(std::vector<VkImageView> colorAttachments, VkExtent2D size, RenderPass& renderPass, const std::string& name)
-        :mName(name)
+        :mName(name), mRenderPass(renderPass)
     {
         assert(colorAttachments.size() != 0);
         mFramebuffers.resize(colorAttachments.size());
