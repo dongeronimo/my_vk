@@ -21,7 +21,6 @@ namespace entities {
         ~GameObject();
         GameObject(const std::string& name, 
             vk::DescriptorService& descriptorService,
-            const std::string& pipeline,  //TODO staticMeshRenderer: Game Object should not have the mesh
             entities::Mesh* mesh);//TODO staticMeshRenderer: Game Object should not have the mesh
         void SetPosition(glm::vec3& pos) {
             mPosition = pos;
@@ -33,8 +32,6 @@ namespace entities {
         glm::quat GetOrientation()const { return mOrientation; }
         const std::string mName;
         const uint32_t mId;
-        const hash_t mPipelineHash;
-        const std::string mPipelineName;
         void Draw(VkCommandBuffer cmdBuffer, 
             Pipeline& pipeline,
             uint32_t currentFrame);//TODO staticMeshRenderer: this belongs to StaticMeshRenderer

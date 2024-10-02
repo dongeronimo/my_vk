@@ -20,6 +20,7 @@
 #include "entities/light_uniform_buffer.h"
 #include <algorithm>
 #include <vk\depth_buffer.h>
+#include "utils/concatenate.h"
 
 typedef hash_t renderpass_hash_t;
 typedef hash_t pipeline_hash_t;
@@ -114,12 +115,13 @@ int main(int argc, char** argv)
     gRenderPassPipelineTable.insert({ utils::Hash("shadowMapRenderPass"), {utils::Hash("shadowMapPipeline")} });
     //create the synchronization objects
     vk::SyncronizationService syncService;
+    //////////////////////GAME OBJECTS//////////////////////
     //Create a game object
-    auto gFoo = new entities::GameObject("foo", descriptorService,"demoPipeline", meshService.GetMesh("monkey.glb"));
+    auto gFoo = new entities::GameObject("foo", descriptorService, meshService.GetMesh("monkey.glb"));
     gFoo->SetPosition(glm::vec3( 0,4,0 ));
     gFoo->SetOrientation(glm::quat());
     gFoo->OnDraw = [](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
-        if (pipeline.Hash() == utils::Hash("phongSolidColor")) {
+        if (pipeline.Hash() == utils::Hash("phongSolidColor")) { //a very rudimentary material system, passing the color that i want.
             entities::ColorPushConstantData color{ {0,1,0,1} };
             pipeline.SetPushConstant<entities::ColorPushConstantData>(
                 color, go.mId, commandBuffer, VK_SHADER_STAGE_VERTEX_BIT
@@ -127,14 +129,36 @@ int main(int argc, char** argv)
         }
         };
     gObjects.push_back(gFoo);
-    auto gBar = new entities::GameObject("bar", descriptorService, "demoPipeline", meshService.GetMesh("monkey.glb"));
+    auto gBar = new entities::GameObject("bar", descriptorService, meshService.GetMesh("monkey.glb"));
     gBar->SetPosition(glm::vec3(2, 4, 0));
     gBar->SetOrientation(glm::quat());
-
     gObjects.push_back(gBar);
+    std::vector<entities::GameObject*> tiles;
+    //let's create some tiles
+    for (auto i = 0; i < 5; i++) {
+        for (auto j = 0; j < 5; j++) {
+            auto name = Concatenate("Tile[", i, ",", j, "]");
+            auto tile = new entities::GameObject(name, descriptorService, meshService.GetMesh("4x4tile.glb"));
+            tile->SetPosition(glm::vec3{ i * 2, j * 2, 0.0f }+ glm::vec3{-2.5f, -2.5f, -4.0f});
+            tile->SetOrientation(glm::quat());
+            tile->OnDraw = [i, j](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
+                if (pipeline.Hash() == utils::Hash("phongSolidColor")) {
+                    glm::vec4 _color = { (float)i / 5.0f, (float)j / 5.0f, 0.24f, 1 };
+                    entities::ColorPushConstantData color{ _color };
+                    pipeline.SetPushConstant<entities::ColorPushConstantData>(
+                        color, go.mId, commandBuffer, VK_SHADER_STAGE_VERTEX_BIT
+                    );
+                }
+            };
+            gObjects.push_back(tile);
+            tiles.push_back(tile);
+        }
+    }
+    std::vector<entities::GameObject*> objectsWithShadowAndLight(tiles);
+    objectsWithShadowAndLight.push_back(gFoo);
     //add the game objects to their pipelines
-    gPipelineGameObjectTable.insert({ phongSolidColor->Hash(), {gFoo}});
-    gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar}});
+    gPipelineGameObjectTable.insert({ phongSolidColor->Hash(), objectsWithShadowAndLight});
+    gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar} });
     //Define the camera
     entities::CameraUniformBuffer cameraBuffer;
     cameraBuffer.cameraPos = glm::vec3(-7.0f, -5.0f, 7.0f);

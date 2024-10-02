@@ -42,10 +42,9 @@ namespace entities
 {
     GameObject::GameObject(const std::string& name, 
         vk::DescriptorService& descriptorService, 
-        const std::string& pipeline,
         entities::Mesh* mesh)
-        :mName(name), mId(GetNextGameObjectId()), mDescriptorService(descriptorService), mMesh(mesh),
-        mPipelineName(pipeline), mPipelineHash(utils::Hash(pipeline))
+        :mName(name), mId(GetNextGameObjectId()), mDescriptorService(descriptorService), mMesh(mesh)
+
     {
         gAvailableGameObjectsIds[mId] = false;
         //Get the descriptor sets
