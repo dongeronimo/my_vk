@@ -6,6 +6,7 @@
 #include <functional>
 #include <optional>
 #include "entities/light_uniform_buffer.h"
+#include "entities/camera_uniform_buffer.h"
 #include "utils/hash.h"
 namespace vk {
     class DescriptorService;
@@ -44,7 +45,7 @@ namespace entities
         AmbientLightUniformBuffer ambient;
         DirectionalLightUniformBuffer directionalLights;
     };
-
+    typedef std::function<void(uintptr_t destAddr)> TCameraCallback;
     typedef std::function<LightBuffers()> TLightCallback;
     /// <summary>
     /// Load a shader from the compiled .spv to a shader module
@@ -101,6 +102,7 @@ namespace entities
         PipelineBuilder* SetRasterizerStateInfo(VkPipelineRasterizationStateCreateInfo info);
         PipelineBuilder* SetColorBlending(VkPipelineColorBlendStateCreateInfo info);
         PipelineBuilder* SetViewport(VkViewport vp, VkRect2D scissor);
+        PipelineBuilder* SetCameraCallback(TCameraCallback cbk);
         /// <summary>
         /// This callback is to provide light data for the pipeline. If the callback is defined then in Bind() 
         /// it'll be called and the light data passed to the gpu.
@@ -109,6 +111,7 @@ namespace entities
         /// <returns></returns>
         PipelineBuilder* SetLightDataCallback(TLightCallback cbk);
         Pipeline* Build();
+
     private:
         std::vector<VkPushConstantRange> mPushConstantRanges{};
         std::vector<VkPipelineShaderStageCreateInfo> CreateShaderStageInfoForVertexAndFragment(VkShaderModule vs, 
@@ -148,8 +151,10 @@ namespace entities
             );
         }
         friend class PipelineBuilder;
-    private:
+        TCameraCallback mCameraCallback;
         vk::DescriptorService& mDescriptorService;
+    private:
+        
         std::optional<TLightCallback> mLightDataCallback;
         hash_t mHash;
         VkRect2D mScissor;

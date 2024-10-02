@@ -152,6 +152,12 @@ namespace entities
         return this;
     }
 
+    PipelineBuilder* PipelineBuilder::SetCameraCallback(TCameraCallback cbk)
+    {
+        mPipeline->mCameraCallback = cbk;
+        return this;
+    }
+
     PipelineBuilder* PipelineBuilder::SetLightDataCallback(TLightCallback cbk)
     {
         mPipeline->mLightDataCallback = cbk;

@@ -6,6 +6,7 @@ namespace vk {
         DepthBuffer(uint32_t w, uint32_t h, VkFormat format);
         DepthBuffer(uint32_t w, uint32_t h);
         ~DepthBuffer();
+        VkImage GetImage()const;
         VkImageView GetImageView()const;
         VkFormat GetFormat()const;
     private:

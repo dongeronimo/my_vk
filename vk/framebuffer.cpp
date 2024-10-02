@@ -7,7 +7,7 @@
 namespace vk
 {
     Framebuffer::Framebuffer(std::vector<VkImageView> colorAttachments, 
-        std::vector<VkImageView> depthAttachments,
+        VkImageView depthAttachment,
         VkExtent2D size, 
         RenderPass& renderPass, 
         const std::string& name): mName(name), mRenderPass(renderPass)
@@ -18,7 +18,7 @@ namespace vk
         for (size_t i = 0; i < colorAttachments.size(); i++) {
             VkImageView colorAttachment = colorAttachments[i];
             std::vector<VkImageView> attachments{
-                colorAttachment, depthAttachments[i]
+                colorAttachment, depthAttachment 
             };
             VkFramebufferCreateInfo framebufferInfo{};
             framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

@@ -1,13 +1,17 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <string>
+#include <functional>
 #include <vector>
 #include <glm/glm.hpp>
+#include <optional>
 namespace vk
 {
     class RenderPass
     {
     public:
+        typedef std::function<void(RenderPass* rp, VkCommandBuffer cmdBuffer, uint32_t currentFrame)> TOnRenderPassBegin;
+        typedef std::function<void(RenderPass* rp,VkCommandBuffer cmdBuffer, uint32_t currentFrame)> TOnRenderPassEnd;
         /// <summary>
         /// A render pass with only color buffer
         /// </summary>
@@ -30,9 +34,12 @@ namespace vk
             VkClearDepthStencilValue depth,
             VkFramebuffer framebuffer,
             VkExtent2D extent, 
-            VkCommandBuffer cmdBuffer);
-        void EndRenderPass(VkCommandBuffer cmdBuffer);
+            VkCommandBuffer cmdBuffer, 
+            uint32_t currentFrame);
+        void EndRenderPass(VkCommandBuffer cmdBuffer, uint32_t currentFrame);
         ~RenderPass();
+        std::optional<TOnRenderPassEnd> mOnRenderPassEndCallback;
+        std::optional<TOnRenderPassBegin> mOnRenderPassBeginCallback;
         const std::string mName;
         /// <summary>
         /// Builds a render pass for shadow mapping, it'll have one depth buffer and no color buffer.

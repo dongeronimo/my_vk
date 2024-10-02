@@ -64,6 +64,9 @@ namespace entities
         if (OnDraw ) {
             (*OnDraw)(*this, pipeline, currentFrame, cmdBuffer);
         }
+        //apply camera
+        pipeline.mCameraCallback(pipeline.mDescriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0)[currentFrame]);
+        
         //bind the mesh.
         mMesh->Bind(cmdBuffer);
         //bind the descriptor sets

@@ -15,7 +15,7 @@ namespace vk {
         depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // No stencil use
         depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Starting layout
-        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;  // To be sampled later
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; 
         VkAttachmentReference depthAttachmentRef = {};
         depthAttachmentRef.attachment = 0;  // Index of the depth attachment
         depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;  // Layout for depth writing
@@ -162,8 +162,11 @@ namespace vk {
     }
     void RenderPass::BeginRenderPass(glm::vec4 color, 
         VkClearDepthStencilValue depth, VkFramebuffer framebuffer,
-        VkExtent2D extent, VkCommandBuffer cmdBuffer)
+        VkExtent2D extent, VkCommandBuffer cmdBuffer, uint32_t currentFrame)
     {
+        if (mOnRenderPassBeginCallback) {
+            (*mOnRenderPassBeginCallback)(this, cmdBuffer, currentFrame);
+        }
         //begin the render pass of the render pass
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -177,10 +180,16 @@ namespace vk {
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
         vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        vk::SetMark({ 0.0f, 0.8f, 4.0f, 1.0f }, mName, cmdBuffer);
     }
-    void RenderPass::EndRenderPass(VkCommandBuffer cmdBuffer)
+    void RenderPass::EndRenderPass(VkCommandBuffer cmdBuffer, uint32_t currentFrame)
     {
+        vk::EndMark(cmdBuffer);
         vkCmdEndRenderPass(cmdBuffer);
+        if (mOnRenderPassEndCallback) {
+            (*mOnRenderPassEndCallback)(this, cmdBuffer, currentFrame);
+        }
     }
     RenderPass::~RenderPass()
     {

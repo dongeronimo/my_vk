@@ -21,12 +21,12 @@
 #include <algorithm>
 #include <vk\depth_buffer.h>
 #include "utils/concatenate.h"
-
+#include <glm/gtc/matrix_transform.hpp>
 typedef hash_t renderpass_hash_t;
 typedef hash_t pipeline_hash_t;
 const uint32_t SHADOW_MAP_WIDTH = 512;
 const uint32_t SHADOW_MAP_HEIGHT = 512;
-
+std::vector<vk::DepthBuffer*> gDepthBuffersForShadowMapping(MAX_FRAMES_IN_FLIGHT);
 std::vector<entities::GameObject*> gObjects{};
 std::map<pipeline_hash_t, entities::Pipeline*> gPipelines;
 /// <summary>
@@ -37,8 +37,8 @@ std::map<renderpass_hash_t, std::vector<pipeline_hash_t>> gRenderPassPipelineTab
 /// Holds the render passes, on the order they are to be run
 /// </summary>
 std::vector<vk::RenderPass*> gOrderedRenderpasses;
-
-
+entities::LightBuffers lights;
+entities::CameraUniformBuffer cameraBuffer;
 entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService);
 entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService,entities::TLightCallback lightCallback);
 entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService, uint32_t w, uint32_t h);
@@ -56,28 +56,74 @@ int main(int argc, char** argv)
     vk::SwapChain swapChain;
     //create the render pass for onscreen rendering
     vk::RenderPass* mainRenderPass = new vk::RenderPass(utils::FindDepthFormat(instance.GetPhysicalDevice()), swapChain.GetFormat(),"mainRenderPass");
+    mainRenderPass->mOnRenderPassEndCallback = [](vk::RenderPass* renderPass, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
+        //When we end the main render pass we must revert the images used by the shadow map pass back to the layout that it expects them to be.
+        VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barrier.image = gDepthBuffersForShadowMapping[currentFrame]->GetImage();
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        vkCmdPipelineBarrier(
+            cmdBuffer,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,      // Source stage: after shader sampling
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, // Destination stage: before depth attachment write
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+    };
     //Create the render pass for shadow mapping
     vk::RenderPass* shadowMappingRenderPass = vk::RenderPass::RenderPassForShadowMapping("shadowMapRenderPass");
+    shadowMappingRenderPass->mOnRenderPassEndCallback = [](vk::RenderPass* renderPass, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
+        //The shadow map needs to transition the depth buffer to an appropriate layout once it's finished
+         VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//it's in depth stencil layout
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //must go to the layout that shaders understand
+        barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.image = gDepthBuffersForShadowMapping[currentFrame]->GetImage();
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        vkCmdPipelineBarrier(
+            cmdBuffer,
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,  // Source stage: depth write
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,      // Destination stage: shadow map sampling
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+    };
     gOrderedRenderpasses.push_back(shadowMappingRenderPass);
     gOrderedRenderpasses.push_back(mainRenderPass);
     //create the framebuffer for onscreen rendering
     ///Creates the depth buffers for the main framebuffer, one per frame
-    std::vector< vk::DepthBuffer*> depthBuffers(MAX_FRAMES_IN_FLIGHT);
-    std::vector<VkImageView> depthBuffersImageViews(MAX_FRAMES_IN_FLIGHT);
-    for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        depthBuffers[i] = new vk::DepthBuffer(swapChain.GetExtent().width, swapChain.GetExtent().height);
-        depthBuffersImageViews[i] = depthBuffers[i]->GetImageView();
-    }
-    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), depthBuffersImageViews,
+    vk::DepthBuffer depthBuffer(swapChain.GetExtent().width, swapChain.GetExtent().height);
+    VkImageView depthBufferImageView = depthBuffer.GetImageView();
+    vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), depthBufferImageView,
         swapChain.GetExtent(), *mainRenderPass, "mainFramebuffer");
     /////////Create the framebuffer for shadow mapping
     //First, create the buffers
-    std::vector<vk::DepthBuffer*> depthBuffersForShadowMapping(MAX_FRAMES_IN_FLIGHT);
+    
     std::vector<VkImageView> imageViewsForShadowMapping(MAX_FRAMES_IN_FLIGHT);
     for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        depthBuffersForShadowMapping[i] = new vk::DepthBuffer(SHADOW_MAP_WIDTH,
+        gDepthBuffersForShadowMapping[i] = new vk::DepthBuffer(SHADOW_MAP_WIDTH,
             SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT);
-        imageViewsForShadowMapping[i] = depthBuffersForShadowMapping[i]->GetImageView();
+        imageViewsForShadowMapping[i] = gDepthBuffersForShadowMapping[i]->GetImageView();
     }
     //Then create the framebuffer
     vk::Framebuffer shadowMapFramebuffer(imageViewsForShadowMapping, 
@@ -97,8 +143,6 @@ int main(int argc, char** argv)
     //create the pipelines
     entities::Pipeline* demoPipeline = CreateDemoPipeline(mainRenderPass, device, descriptorService);
     entities::TLightCallback lightCallback = []() {
-        entities::LightBuffers lights;
-        memset(&lights, 0, sizeof(entities::LightBuffers));
         lights.ambient.colorAndIntensity = { 1,1,1,0.1f };
         lights.directionalLights.diffuseColorAndIntensity[0] = { 1,1,1,1 };
         lights.directionalLights.direction[0] = { 0,0,-1 };
@@ -159,8 +203,9 @@ int main(int argc, char** argv)
     //add the game objects to their pipelines
     gPipelineGameObjectTable.insert({ phongSolidColor->Hash(), objectsWithShadowAndLight});
     gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar} });
+    gPipelineGameObjectTable.insert({ shadowMapPipeline->Hash(), objectsWithShadowAndLight });
     //Define the camera
-    entities::CameraUniformBuffer cameraBuffer;
+    
     cameraBuffer.cameraPos = glm::vec3(-7.0f, -5.0f, 7.0f);
     cameraBuffer.view = glm::lookAt(cameraBuffer.cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     //some perspective projection
@@ -176,7 +221,7 @@ int main(int argc, char** argv)
 
 
     mainWindow.OnRender = [&timer, &syncService, &currentFrame, 
-        &swapChain, &mainFramebuffer,&shadowMapFramebuffer, &descriptorService, &cameraBuffer]
+        &swapChain, &mainFramebuffer,&shadowMapFramebuffer, &descriptorService]
         (app::Window* w) 
         {
             timer.Advance();//advance the clock
@@ -189,12 +234,12 @@ int main(int argc, char** argv)
                 if (mainFramebuffer.mRenderPass.mName == R->mName) {
                     R->BeginRenderPass({ 0,0,0,1 }, { 1.0f, 0 },
                         mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH },
-                        frame.CommandBuffer());
+                        frame.CommandBuffer(), currentFrame);
                 }
                 if (shadowMapFramebuffer.mRenderPass.mName == R->mName) {
                     R->BeginRenderPass({ 0,0,0,1 }, { 1.0f, 0 },
-                        shadowMapFramebuffer.GetFramebuffer(frame.ImageIndex()), { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT},
-                        frame.CommandBuffer());
+                        shadowMapFramebuffer.GetFramebuffer(frame.ImageIndex()%MAX_FRAMES_IN_FLIGHT), { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT},
+                        frame.CommandBuffer(), currentFrame);
                 }
                 //for each pipeline P of R bind P
                 std::vector<pipeline_hash_t> pipelineHashes = gRenderPassPipelineTable.at(utils::Hash(R->mName));
@@ -205,10 +250,6 @@ int main(int argc, char** argv)
                 for (auto P : pipelines) {
                     // Bind the pipeline
                     P->Bind(frame.CommandBuffer(), frame.mCurrentFrame);
-                    //set the camera data for the main render pass, all objects will use the same camera
-                    std::vector<uintptr_t> cameraDescriptorSetsAddrs = descriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0);
-                    void* cameraDescriptorSetAddr = reinterpret_cast<void*>(cameraDescriptorSetsAddrs[currentFrame]);
-                    memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
                     //for each gameobject G that uses P draw G
                     if (gPipelineGameObjectTable.count(P->Hash())>0)
                     {
@@ -220,7 +261,7 @@ int main(int argc, char** argv)
                     }
                 }
                 //finish R
-                R->EndRenderPass(frame.CommandBuffer());
+                R->EndRenderPass(frame.CommandBuffer(), currentFrame);
             }
             frame.EndFrame();
             currentFrame = currentFrame + 1;
@@ -240,6 +281,10 @@ entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& d
             entities::LoadShaderModule(device.GetDevice(), "demo.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "demo.frag.spv")
         )->
+        SetCameraCallback([](uintptr_t destAddr) {
+            void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
+            memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
+        })->
         SetDescriptorSetLayouts({
             descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
             descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME) })->
@@ -261,6 +306,10 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
             entities::LoadShaderModule(device.GetDevice(), "phong_color.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "phong_color.frag.spv")
         )->
+        SetCameraCallback([](uintptr_t destAddr) {
+        void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
+        memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
+            })->
         SetDescriptorSetLayouts({ 
             descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
             descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME),
@@ -290,7 +339,19 @@ entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Devi
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
         SetColorBlending(entities::GetNoColorBlend())->
         SetViewport(entities::GetViewportForSize(w, h), entities::GetScissor(w, h))->
-        //...
+        SetCameraCallback([](uintptr_t destAddr) {
+            glm::mat4 orthoMatrix = glm::ortho(-SHADOW_MAP_WIDTH/2.0f, SHADOW_MAP_WIDTH/2.0f, SHADOW_MAP_HEIGHT/2.0f, -SHADOW_MAP_HEIGHT/2.0f, 0.01f, 200.f);
+            glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction[0]);
+            glm::vec3 originInInf = lightDirection * -100.f;
+            glm::mat4 viewMatrix = glm::lookAt(originInInf, glm::vec3(0,0,0), glm::vec3(0,0,1));
+
+            entities::CameraUniformBuffer lightAsCamera;
+            lightAsCamera.proj = orthoMatrix;
+            lightAsCamera.view = viewMatrix;
+            lightAsCamera.cameraPos = originInInf;
+            void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
+            memcpy(cameraDescriptorSetAddr, &lightAsCamera, sizeof(entities::CameraUniformBuffer));
+        })->
         Build();
     return p;
 }

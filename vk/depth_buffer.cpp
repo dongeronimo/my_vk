@@ -12,12 +12,12 @@ namespace vk
         auto physicalDevice = Instance::gInstance->GetPhysicalDevice();
         mDepthFormat = format;
         ImageService::CreateImage(w, h, mDepthFormat,
-            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mImage, mDeviceMemory);
         mImageView = ImageService::CreateImageView(mImage, mDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-        utils::TransitionImageLayout(mImage, mDepthFormat,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-        );
+        //utils::TransitionImageLayout(mImage, mDepthFormat,
+        //    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        //);
     }
     DepthBuffer::DepthBuffer(uint32_t w, uint32_t h)
     {
@@ -28,9 +28,9 @@ namespace vk
             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, mImage, mDeviceMemory);
         mImageView = ImageService::CreateImageView(mImage, mDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-        utils::TransitionImageLayout(mImage, mDepthFormat,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-        );
+        //utils::TransitionImageLayout(mImage, mDepthFormat,
+        //    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        //);
     }
 
     DepthBuffer::~DepthBuffer()
@@ -39,6 +39,11 @@ namespace vk
         vkDestroyImage(device, mImage, nullptr);
         vkDestroyImageView(device, mImageView, nullptr);
         vkFreeMemory(device, mDeviceMemory, nullptr);
+    }
+
+    VkImage DepthBuffer::GetImage() const
+    {
+        return mImage;
     }
 
     VkImageView DepthBuffer::GetImageView() const

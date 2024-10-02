@@ -91,7 +91,7 @@ target_link_libraries(my_vk_engine_demo PRIVATE
     assimp)
 target_compile_definitions(my_vk_engine_demo PRIVATE 
     VK_DEBUG_LEVEL=VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT # See VkDebugUtilsMessageSeverityFlagBitsEXT @vulkan_core.h
-    MAX_FRAMES_IN_FLIGHT=3
+    MAX_FRAMES_IN_FLIGHT=1
     GLM_FORCE_RADIANS #GLM must use radians everywhere
     GLM_FORCE_DEFAULT_ALIGNED_GENTYPES #Force glm vector and matrix types to be aligned
     GLM_FORCE_DEPTH_ZERO_TO_ONE

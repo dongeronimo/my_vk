@@ -153,6 +153,7 @@ namespace vk {
         if (__vkCmdDebugMarkerEndEXT == VK_NULL_HANDLE) {
             __vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetDeviceProcAddr(vk::Device::gDevice->GetDevice(), "vkCmdDebugMarkerEndEXT");
         }
+        __vkCmdDebugMarkerEndEXT(cmd);
     }
 
     void vk::ObjectNamer::Init(VkDevice device)
