@@ -26,6 +26,7 @@ namespace vk
     const uint32_t CAMERA_SET = 0;
     const uint32_t MODEL_MATRIX_SET = 1;
     const uint32_t LIGHT_SET = 2;
+    const uint32_t FAKE_SHADOW_MAP_OUTPUT_SAMPLERS_SET = 3;
     const uint32_t MAX_NUMBER_OF_OBJECTS = 10000 * MAX_FRAMES_IN_FLIGHT;
     const uint32_t MAX_NUMBER_OF_CAMERAS = MAX_FRAMES_IN_FLIGHT;
     const std::string LIGHTNING_LAYOUT_NAME = "LightningDescriptorSet";

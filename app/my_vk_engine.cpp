@@ -185,11 +185,22 @@ int main(int argc, char** argv)
     auto gFoo = new entities::GameObject("foo", descriptorService, meshService.GetMesh("monkey.glb"));
     gFoo->SetPosition(glm::vec3( 0,4,0 ));
     gFoo->SetOrientation(glm::quat());
-    gFoo->OnDraw = [](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
+    gFoo->OnDraw = [&descriptorService](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
         if (pipeline.Hash() == utils::Hash("phongSolidColor")) { //a very rudimentary material system, passing the color that i want.
             entities::ColorPushConstantData color{ {0,1,0,1} };
             pipeline.SetPushConstant<entities::ColorPushConstantData>(
                 color, go.mId, commandBuffer, VK_SHADER_STAGE_VERTEX_BIT
+            );
+            ///use the shadow map samplers
+            std::vector<VkDescriptorSet> samplerDescriptorSetRingBuffer = descriptorService.DescriptorSet(vk::FAKE_SHADOW_MAP_SAMPLERS);
+            vkCmdBindDescriptorSets(
+                commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.PipelineLayout(),
+                vk::FAKE_SHADOW_MAP_OUTPUT_SAMPLERS_SET,
+                1,
+                &samplerDescriptorSetRingBuffer[currentFrame],
+                0,
+                nullptr
             );
         }
         };
@@ -206,12 +217,23 @@ int main(int argc, char** argv)
             auto tile = new entities::GameObject(name, descriptorService, meshService.GetMesh("4x4tile.glb"));
             tile->SetPosition(glm::vec3{ i * 2, j * 2, 0.0f }+ glm::vec3{-2.5f, -2.5f, -4.0f});
             tile->SetOrientation(glm::quat());
-            tile->OnDraw = [i, j](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
+            tile->OnDraw = [i, j, &descriptorService](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
                 if (pipeline.Hash() == utils::Hash("phongSolidColor")) {
                     glm::vec4 _color = { (float)i / 5.0f, (float)j / 5.0f, 0.24f, 1 };
                     entities::ColorPushConstantData color{ _color };
                     pipeline.SetPushConstant<entities::ColorPushConstantData>(
                         color, go.mId, commandBuffer, VK_SHADER_STAGE_VERTEX_BIT
+                    );
+                    ///use the shadow map samplers
+                    std::vector<VkDescriptorSet> samplerDescriptorSetRingBuffer = descriptorService.DescriptorSet(vk::FAKE_SHADOW_MAP_SAMPLERS);
+                    vkCmdBindDescriptorSets(
+                        commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                        pipeline.PipelineLayout(),
+                        vk::FAKE_SHADOW_MAP_OUTPUT_SAMPLERS_SET,
+                        1,
+                        &samplerDescriptorSetRingBuffer[currentFrame],
+                        0,
+                        nullptr
                     );
                 }
             };
