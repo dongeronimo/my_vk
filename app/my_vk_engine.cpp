@@ -22,11 +22,13 @@
 #include <vk\depth_buffer.h>
 #include "utils/concatenate.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <utils/ring_buffer.h>
+
 typedef hash_t renderpass_hash_t;
 typedef hash_t pipeline_hash_t;
 const uint32_t SHADOW_MAP_WIDTH = 512;
 const uint32_t SHADOW_MAP_HEIGHT = 512;
-std::vector<vk::DepthBuffer*> gDepthBuffersForShadowMapping(MAX_FRAMES_IN_FLIGHT);
+//std::vector<vk::DepthBuffer*> gDepthBuffersForShadowMapping(MAX_FRAMES_IN_FLIGHT);
 std::vector<entities::GameObject*> gObjects{};
 std::map<pipeline_hash_t, entities::Pipeline*> gPipelines;
 /// <summary>
@@ -54,61 +56,89 @@ int main(int argc, char** argv)
     vk::Device device(instance.GetPhysicalDevice(),instance.GetInstance(), instance.GetSurface(), vk::GetValidationLayerNames());
     //Create the swap chain
     vk::SwapChain swapChain;
+    //a fake shadow render pass to study how to pass data from one render pass to another.
+    vk::RenderPass* fakeShadowsRenderPass = vk::RenderPass::FakeShadowMapPass("FakeShadowMapRenderPass");
+    
+    /////////Create the framebuffer for the fake shadow map
+    ///TODO refactor: this is not the correct place for those things. They are here for debugging
+    std::vector<VkImage> fakeShadowMapImages(MAX_FRAMES_IN_FLIGHT);
+    std::vector<VkImageView> fakeShadowMapImageViews(MAX_FRAMES_IN_FLIGHT);
+    std::vector<VkDeviceMemory> fakeShadowMapImageMemories(MAX_FRAMES_IN_FLIGHT);
+    VkImage fakeShadowMapDepthImage;
+    VkImageView fakeShadowMapDepthImageView;
+    VkDeviceMemory fakeShadowMapDeviceMemory;
+    vk::ImageService::CreateImage(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, fakeShadowMapDepthImage, fakeShadowMapDeviceMemory);
+    fakeShadowMapDepthImageView = vk::ImageService::CreateImageView(fakeShadowMapDepthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vk::ImageService::CreateImage(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, fakeShadowMapImages[i], fakeShadowMapImageMemories[i]);
+        fakeShadowMapImageViews[i] = vk::ImageService::CreateImageView(fakeShadowMapImages[i], VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+        auto n0 = Concatenate("FakeShadowMapRenderPassImage", i);
+        auto n1 = Concatenate("FakeShadowMapRenderPassImageView", i);
+        auto n2 = Concatenate("FakeShadowMapRenderPassImageMemory", i);
+        SET_NAME(fakeShadowMapImages[i], VK_OBJECT_TYPE_IMAGE, n0.c_str());
+        SET_NAME(fakeShadowMapImageViews[i], VK_OBJECT_TYPE_IMAGE_VIEW, n1.c_str());
+        SET_NAME(fakeShadowMapImageMemories[i], VK_OBJECT_TYPE_DEVICE_MEMORY, n2.c_str());
+    }
+
     //create the render pass for onscreen rendering
     vk::RenderPass* mainRenderPass = new vk::RenderPass(utils::FindDepthFormat(instance.GetPhysicalDevice()), swapChain.GetFormat(),"mainRenderPass");
-    mainRenderPass->mOnRenderPassEndCallback = [](vk::RenderPass* renderPass, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
-        //When we end the main render pass we must revert the images used by the shadow map pass back to the layout that it expects them to be.
-        VkImageMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        barrier.image = gDepthBuffersForShadowMapping[currentFrame]->GetImage();
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
-
-        vkCmdPipelineBarrier(
+    mainRenderPass->mOnRenderPassEndCallback = [&fakeShadowMapImages, &fakeShadowMapDepthImage](vk::RenderPass* renderPass, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
+        //move the color attachment from the texture to output of pipeline
+        utils::TransitionImageLayout(
             cmdBuffer,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,      // Source stage: after shader sampling
-            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, // Destination stage: before depth attachment write
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier
+            fakeShadowMapImages[currentFrame],
+            VK_FORMAT_R8G8B8A8_UNORM,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        utils::TransitionImageLayout(
+            cmdBuffer,
+            fakeShadowMapDepthImage,
+            VK_FORMAT_D32_SFLOAT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,//VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
         );
     };
     //Create the render pass for shadow mapping
-    vk::RenderPass* shadowMappingRenderPass = vk::RenderPass::RenderPassForShadowMapping("shadowMapRenderPass");
-    shadowMappingRenderPass->mOnRenderPassEndCallback = [](vk::RenderPass* renderPass, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
-        //The shadow map needs to transition the depth buffer to an appropriate layout once it's finished
-         VkImageMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//it's in depth stencil layout
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //must go to the layout that shaders understand
-        barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barrier.image = gDepthBuffersForShadowMapping[currentFrame]->GetImage();
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
+    //vk::RenderPass* shadowMappingRenderPass = vk::RenderPass::RenderPassForShadowMapping("shadowMapRenderPass");
+    //shadowMappingRenderPass->mOnRenderPassEndCallback = [](vk::RenderPass* renderPass, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
+    //    //The shadow map needs to transition the depth buffer to an appropriate layout once it's finished
+    //     VkImageMemoryBarrier barrier = {};
+    //    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    //    barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//it's in depth stencil layout
+    //    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //must go to the layout that shaders understand
+    //    barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    //    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    //    barrier.image = gDepthBuffersForShadowMapping[currentFrame]->GetImage();
+    //    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    //    barrier.subresourceRange.baseMipLevel = 0;
+    //    barrier.subresourceRange.levelCount = 1;
+    //    barrier.subresourceRange.baseArrayLayer = 0;
+    //    barrier.subresourceRange.layerCount = 1;
 
-        vkCmdPipelineBarrier(
-            cmdBuffer,
-            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,  // Source stage: depth write
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,      // Destination stage: shadow map sampling
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier
-        );
-    };
-    gOrderedRenderpasses.push_back(shadowMappingRenderPass);
+    //    vkCmdPipelineBarrier(
+    //        cmdBuffer,
+    //        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,  // Source stage: depth write
+    //        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,      // Destination stage: shadow map sampling
+    //        0,
+    //        0, nullptr,
+    //        0, nullptr,
+    //        1, &barrier
+    //    );
+    //};
+    //
+    gOrderedRenderpasses.push_back(fakeShadowsRenderPass);
     gOrderedRenderpasses.push_back(mainRenderPass);
     //create the framebuffer for onscreen rendering
     ///Creates the depth buffers for the main framebuffer, one per frame
@@ -116,19 +146,47 @@ int main(int argc, char** argv)
     VkImageView depthBufferImageView = depthBuffer.GetImageView();
     vk::Framebuffer mainFramebuffer(swapChain.GetImageViews(), depthBufferImageView,
         swapChain.GetExtent(), *mainRenderPass, "mainFramebuffer");
+    /////////////fake shadows
+    vk::Framebuffer fakeShadowMapFramebuffer(fakeShadowMapImageViews, fakeShadowMapDepthImageView, { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT }, *fakeShadowsRenderPass, "FakeShadowMapFramebuffer");
+    fakeShadowsRenderPass->mOnRenderPassEndCallback = [&fakeShadowMapImages, &fakeShadowMapDepthImage](vk::RenderPass* rp, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
+        //move the color attachment from the layout that receives the render result to the layout
+        //that can be sampled by shaders
+        utils::TransitionImageLayout(
+            cmdBuffer,
+            fakeShadowMapImages[currentFrame], 
+            VK_FORMAT_R8G8B8A8_UNORM, 
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        utils::TransitionImageLayout(
+            cmdBuffer,
+            fakeShadowMapDepthImage,
+            VK_FORMAT_D32_SFLOAT,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+        );
+    };
     /////////Create the framebuffer for shadow mapping
     //First, create the buffers
-    
-    std::vector<VkImageView> imageViewsForShadowMapping(MAX_FRAMES_IN_FLIGHT);
-    for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        gDepthBuffersForShadowMapping[i] = new vk::DepthBuffer(SHADOW_MAP_WIDTH,
-            SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT);
-        imageViewsForShadowMapping[i] = gDepthBuffersForShadowMapping[i]->GetImageView();
-    }
-    //Then create the framebuffer
-    vk::Framebuffer shadowMapFramebuffer(imageViewsForShadowMapping, 
-        { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT }, 
-        *shadowMappingRenderPass, "shadowMapFrameBuffer");
+    //std::vector<VkImageView> imageViewsForShadowMapping(MAX_FRAMES_IN_FLIGHT);
+    //for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    //    gDepthBuffersForShadowMapping[i] = new vk::DepthBuffer(SHADOW_MAP_WIDTH,
+    //        SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT);
+    //    imageViewsForShadowMapping[i] = gDepthBuffersForShadowMapping[i]->GetImageView();
+    //}
+    ////Then create the framebuffer
+    //vk::Framebuffer shadowMapFramebuffer(imageViewsForShadowMapping, 
+    //    { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT }, 
+    //    *shadowMappingRenderPass, "shadowMapFrameBuffer");
 
     ////////////////////
     //create the samplers
@@ -149,11 +207,11 @@ int main(int argc, char** argv)
         return lights;
     };
     entities::Pipeline* phongSolidColor = CreatePhongSolidColorPipeline(mainRenderPass, device, descriptorService, lightCallback);  
-    entities::Pipeline* shadowMapPipeline = CreateShadowMapPipeline(
-        shadowMappingRenderPass, device, descriptorService, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
+    entities::Pipeline* fakeShadowMapPipeline = CreateShadowMapPipeline(
+        fakeShadowsRenderPass, device, descriptorService, SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT);
     gPipelines.insert({ utils::Hash("phongSolidColor") , phongSolidColor });
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
-    gPipelines.insert({ utils::Hash("shadowMapPipeline"), shadowMapPipeline });
+    gPipelines.insert({ utils::Hash("fakeShadowMapPipeline"), fakeShadowMapPipeline });
     //register that mainRenderPass has these pipelines
     gRenderPassPipelineTable.insert({ utils::Hash("mainRenderPass"), {utils::Hash("phongSolidColor"),  utils::Hash("demoPipeline")} });
     gRenderPassPipelineTable.insert({ utils::Hash("shadowMapRenderPass"), {utils::Hash("shadowMapPipeline")} });
@@ -203,7 +261,7 @@ int main(int argc, char** argv)
     //add the game objects to their pipelines
     gPipelineGameObjectTable.insert({ phongSolidColor->Hash(), objectsWithShadowAndLight});
     gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar} });
-    gPipelineGameObjectTable.insert({ shadowMapPipeline->Hash(), objectsWithShadowAndLight });
+    gPipelineGameObjectTable.insert({ fakeShadowMapPipeline->Hash(), objectsWithShadowAndLight });
     //Define the camera
     
     cameraBuffer.cameraPos = glm::vec3(-7.0f, -5.0f, 7.0f);
@@ -221,7 +279,7 @@ int main(int argc, char** argv)
 
 
     mainWindow.OnRender = [&timer, &syncService, &currentFrame, 
-        &swapChain, &mainFramebuffer,&shadowMapFramebuffer, &descriptorService]
+        &swapChain, &mainFramebuffer,&fakeShadowMapFramebuffer, &descriptorService]
         (app::Window* w) 
         {
             timer.Advance();//advance the clock
@@ -236,9 +294,9 @@ int main(int argc, char** argv)
                         mainFramebuffer.GetFramebuffer(frame.ImageIndex()), { SCREEN_WIDTH,SCREEN_HEIGH },
                         frame.CommandBuffer(), currentFrame);
                 }
-                if (shadowMapFramebuffer.mRenderPass.mName == R->mName) {
+                if (fakeShadowMapFramebuffer.mRenderPass.mName == R->mName) {
                     R->BeginRenderPass({ 0,0,0,1 }, { 1.0f, 0 },
-                        shadowMapFramebuffer.GetFramebuffer(frame.ImageIndex()%MAX_FRAMES_IN_FLIGHT), { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT},
+                        fakeShadowMapFramebuffer.GetFramebuffer(frame.ImageIndex()%MAX_FRAMES_IN_FLIGHT), { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT},
                         frame.CommandBuffer(), currentFrame);
                 }
                 //for each pipeline P of R bind P
@@ -323,10 +381,9 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
         Build();
     return phongSolidColor;
 }
-
 entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Device& device, vk::DescriptorService& descriptorService, uint32_t w, uint32_t h)
 {
-    entities::Pipeline* p = (new entities::PipelineBuilder("shadowMapPipeline", descriptorService))->
+    entities::Pipeline* p = (new entities::PipelineBuilder("fakeShadowMapPipeline", descriptorService))->
         SetRenderPass(renderPass)->
         SetShaderModules(
             entities::LoadShaderModule(device.GetDevice(), "shadow_map.vert.spv"),
@@ -354,4 +411,6 @@ entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Devi
         })->
         Build();
     return p;
+
+    
 }

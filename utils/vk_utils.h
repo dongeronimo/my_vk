@@ -12,4 +12,8 @@ namespace utils {
 
     void TransitionImageLayout(VkImage image, VkFormat format,
         VkImageLayout oldLayout, VkImageLayout newLayout);
+
+    void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout,
+        VkImageAspectFlags subresourceAspectMask, VkAccessFlags srcAccessMask, VkAccessFlags destAccessMask, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage);
+
 }

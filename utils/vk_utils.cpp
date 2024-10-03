@@ -125,3 +125,40 @@ void utils::TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout 
     );
     myDevice->SubmitAndFinishCommands(commandBuffer);
 }
+
+void utils::TransitionImageLayout(VkCommandBuffer commandBuffer, 
+    VkImage image, 
+    VkFormat format, 
+    VkImageLayout oldLayout, 
+    VkImageLayout newLayout, 
+    VkImageAspectFlags subresourceAspectMask, 
+    VkAccessFlags srcAccessMask, 
+    VkAccessFlags destAccessMask, 
+    VkPipelineStageFlags sourceStage, 
+    VkPipelineStageFlags destinationStage)
+{
+    auto myDevice = vk::Device::gDevice;
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = subresourceAspectMask;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = srcAccessMask;
+    barrier.dstAccessMask = destAccessMask;
+    // Issue the barrier to transition the image layout
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        sourceStage, destinationStage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+}

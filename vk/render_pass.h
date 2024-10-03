@@ -47,6 +47,8 @@ namespace vk
         /// <param name="name"></param>
         /// <returns></returns>
         static RenderPass* RenderPassForShadowMapping(const std::string& name);
+
+        static RenderPass* FakeShadowMapPass(const std::string& name);
     private:
         RenderPass(const std::string& name) :mName(name) {};
         VkRenderPass mRenderPass = VK_NULL_HANDLE;
