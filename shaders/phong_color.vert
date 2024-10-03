@@ -20,7 +20,9 @@ layout(location=0) out vec4 outColor;
 layout(location=1) out vec3 outFragPos;
 layout(location=2) out vec3 outNormal;
 layout(location=3) out vec3 outCP;
+layout(location=4) out vec2 outUV0;
 void main() {
+    outUV0 = inUV0;
     outColor = colorPushConstant.color;
     outFragPos = vec3(objectUniform.model * vec4(inPosition,1.0));
     outCP = cameraUniform.cameraPos;

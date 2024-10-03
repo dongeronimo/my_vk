@@ -67,6 +67,11 @@ namespace vk
         CreateDescriptorSetLayoutForLight();
         CreateDescriptorPoolForLight();
         CreateDescriptorSetForLight();
+
+        CreateDescriptorSetLayoutForFakeShadowBuffer();
+        CreateDescriptorPoolForFakeShadowBuffer();
+        CreateDescriptorSetForFakeShadowBuffer();
+    
     }
     DescriptorService::~DescriptorService()
     {
@@ -621,5 +626,111 @@ namespace vk
         mBaseAddesses.insert({ utils::Hash(directional_name), directionalLightBaseAddress });
         mDescriptorSetsBuffersOffsets.insert({ utils::Hash(directional_name), directionalAddrs });
         mDescriptorSets.insert({ utils::Hash(LIGHTNING_LAYOUT_NAME), descriptorSets });
+    }
+    void DescriptorService::CreateDescriptorSetLayoutForFakeShadowBuffer()
+    {
+        const VkDevice device = Device::gDevice->GetDevice();
+        // Step 1: Create Descriptor Set Layout
+        VkDescriptorSetLayoutBinding colorSamplerLayoutBinding = {};
+        colorSamplerLayoutBinding.binding = 0;
+        colorSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        colorSamplerLayoutBinding.descriptorCount = 1;
+        colorSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        colorSamplerLayoutBinding.pImmutableSamplers = nullptr;
+
+        VkDescriptorSetLayoutBinding depthSamplerLayoutBinding = {};
+        depthSamplerLayoutBinding.binding = 1;
+        depthSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        depthSamplerLayoutBinding.descriptorCount = 1;
+        depthSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        depthSamplerLayoutBinding.pImmutableSamplers = nullptr;
+
+        std::array<VkDescriptorSetLayoutBinding, 2> bindings = { colorSamplerLayoutBinding, depthSamplerLayoutBinding };
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        VkDescriptorSetLayout descriptorSetLayout;
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+        mLayouts.insert({ utils::Hash(FAKE_SHADOW_MAP_SAMPLERS), descriptorSetLayout });
+        auto n = Concatenate(FAKE_SHADOW_MAP_SAMPLERS, "_DescriptorSetLayouts");
+        SET_NAME(descriptorSetLayout, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, n.c_str());
+    }
+    void DescriptorService::CreateDescriptorPoolForFakeShadowBuffer()
+    {
+        const VkDevice device = Device::gDevice->GetDevice();
+        // Step 2: Create Descriptor Pool
+        VkDescriptorPoolSize poolSize = {};
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = 2;
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.maxSets = 1;
+
+        VkDescriptorPool descriptorPool;
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+        auto n = Concatenate(FAKE_SHADOW_MAP_SAMPLERS, "_DescriptorPool");
+        SET_NAME(descriptorPool, VK_OBJECT_TYPE_DESCRIPTOR_POOL, n.c_str());
+        mDescriptorPools.insert({ FAKE_SHADOW_MAP_SAMPLERS, descriptorPool });
+    }
+    void DescriptorService::CreateDescriptorSetForFakeShadowBuffer(std::vector<VkImageView> colorImageViews, VkImageView depthImageView)
+    {
+        VkDescriptorSetLayout descriptorSetLayout = mLayouts.at(utils::Hash(FAKE_SHADOW_MAP_SAMPLERS));
+        VkDescriptorPool descriptorPool = mDescriptorPools.at(utils::Hash(FAKE_SHADOW_MAP_SAMPLERS));
+        VkDevice device = vk::Device::gDevice->GetDevice();
+        
+        std::vector<VkDescriptorSet> descriptorSet(MAX_FRAMES_IN_FLIGHT);
+        std::array<VkDescriptorSetLayout, MAX_FRAMES_IN_FLIGHT> layouts;
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) layouts[i] = descriptorSetLayout;
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = descriptorSet.size();
+        allocInfo.pSetLayouts = layouts.data();
+
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSet.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor set!");
+        }
+        VkSampler sampler = mSamplerService.GetSampler(LINEAR_REPEAT_NORMALIZED_NONMIPMAP_SAMPLER);
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            const auto ds_name = Concatenate(FAKE_SHADOW_MAP_SAMPLERS, "DescriptorSet");
+            SET_NAME(descriptorSet[i], VK_OBJECT_TYPE_DESCRIPTOR_SET, ds_name.c_str());
+            VkDescriptorImageInfo colorImageInfo = {};
+            colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            colorImageInfo.imageView = colorImageViews[i]; // Image view from fakeShadowMapRenderPass
+            colorImageInfo.sampler = sampler; 
+
+            VkDescriptorImageInfo depthImageInfo = {};
+            depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            depthImageInfo.imageView = depthImageView; // Image view from fakeShadowMapRenderPass
+            depthImageInfo.sampler = sampler; 
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = descriptorSet[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pImageInfo = &colorImageInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = descriptorSet[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pImageInfo = &depthImageInfo;
+
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+
+        }
+        mDescriptorSets.insert({ utils::Hash(FAKE_SHADOW_MAP_SAMPLERS), descriptorSet });
     }
 }

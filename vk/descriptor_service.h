@@ -32,6 +32,7 @@ namespace vk
     const std::string CAMERA_LAYOUT_NAME = "CameraDataDescriptorSet";
     const std::string MODEL_MATRIX_LAYOUT_NAME = "ModelMatrixDescriptorSet";
     const std::string SAMPLER_LAYOUT_NAME = "SamplerDescriptorSet";
+    const std::string FAKE_SHADOW_MAP_SAMPLERS = "FakeShadowMapSamplers";
     /// <summary>
     /// Manages descriptor set layouts, descriptor pools and descriptor sets.
     /// 
@@ -111,5 +112,9 @@ namespace vk
         void CreateDescriptorSetLayoutForLight();
         void CreateDescriptorPoolForLight();
         void CreateDescriptorSetForLight();
+
+        void CreateDescriptorSetLayoutForFakeShadowBuffer();
+        void CreateDescriptorPoolForFakeShadowBuffer();
+        void CreateDescriptorSetForFakeShadowBuffer(std::vector<VkImageView> colorImageViews, VkImageView depthImageViews);
     };
 }

@@ -110,33 +110,6 @@ int main(int argc, char** argv)
             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
         );
     };
-    //Create the render pass for shadow mapping
-    //vk::RenderPass* shadowMappingRenderPass = vk::RenderPass::RenderPassForShadowMapping("shadowMapRenderPass");
-    //shadowMappingRenderPass->mOnRenderPassEndCallback = [](vk::RenderPass* renderPass, VkCommandBuffer cmdBuffer, uint32_t currentFrame) {
-    //    //The shadow map needs to transition the depth buffer to an appropriate layout once it's finished
-    //     VkImageMemoryBarrier barrier = {};
-    //    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    //    barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//it's in depth stencil layout
-    //    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //must go to the layout that shaders understand
-    //    barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    //    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    //    barrier.image = gDepthBuffersForShadowMapping[currentFrame]->GetImage();
-    //    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    //    barrier.subresourceRange.baseMipLevel = 0;
-    //    barrier.subresourceRange.levelCount = 1;
-    //    barrier.subresourceRange.baseArrayLayer = 0;
-    //    barrier.subresourceRange.layerCount = 1;
-
-    //    vkCmdPipelineBarrier(
-    //        cmdBuffer,
-    //        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,  // Source stage: depth write
-    //        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,      // Destination stage: shadow map sampling
-    //        0,
-    //        0, nullptr,
-    //        0, nullptr,
-    //        1, &barrier
-    //    );
-    //};
     //
     gOrderedRenderpasses.push_back(fakeShadowsRenderPass);
     gOrderedRenderpasses.push_back(mainRenderPass);
@@ -175,20 +148,7 @@ int main(int argc, char** argv)
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
         );
     };
-    /////////Create the framebuffer for shadow mapping
-    //First, create the buffers
-    //std::vector<VkImageView> imageViewsForShadowMapping(MAX_FRAMES_IN_FLIGHT);
-    //for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-    //    gDepthBuffersForShadowMapping[i] = new vk::DepthBuffer(SHADOW_MAP_WIDTH,
-    //        SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT);
-    //    imageViewsForShadowMapping[i] = gDepthBuffersForShadowMapping[i]->GetImageView();
-    //}
-    ////Then create the framebuffer
-    //vk::Framebuffer shadowMapFramebuffer(imageViewsForShadowMapping, 
-    //    { SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT }, 
-    //    *shadowMappingRenderPass, "shadowMapFrameBuffer");
-
-    ////////////////////
+ 
     //create the samplers
     vk::SamplerService samplersService;
     //create the images

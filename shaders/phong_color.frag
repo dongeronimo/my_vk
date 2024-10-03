@@ -7,14 +7,20 @@ layout (set = 2, binding = 1) uniform AmbientLightUniformBuffer {
     vec4 diffuseColorAndIntensity;
 } ambientLight;
 
+layout(set = 3, binding = 0) uniform sampler2D colorSampler;
+layout(set = 3, binding = 1) uniform sampler2D depthSampler;
+
 layout (location=0) out vec4 outColor;
 
 layout (location=0) in vec4 inColor;
 layout (location=1) in vec3 inFragPos;
 layout (location=2) in vec3 inNormal;
 layout (location=3) in vec3 inCP;
+layout (location=4) in vec2 inUV0;
 //TODO phong: use multiple lights
 void main(){
+    vec4 color = texture(colorSampler, inUV0);
+    float depth = texture(depthSampler, inUV0).r; // Assuming depth is stored in the red channel
     //the ambient component
     vec3 ambient = ambientLight.diffuseColorAndIntensity.rgb * ambientLight.diffuseColorAndIntensity.a;
     //diffuse component
@@ -29,5 +35,5 @@ void main(){
     vec3 specular = spec * directionalLight.diffuseColorAndIntensity[0].rgb * directionalLight.diffuseColorAndIntensity[0].a; 
     //combine results
     vec3 phong = ambient + diffuse + specular;
-    outColor = vec4(phong * inColor.rgb, inColor.a);
+    outColor = vec4(phong * color.rgb, color.a);
 }
