@@ -41,7 +41,7 @@ namespace vk
     public:
         
         DescriptorService(SamplerService& samplerService,
-            ImageService& imageService);
+            ImageService& imageService, std::vector<VkImageView> fakeShadowMapColorBuffers, VkImageView fakeShadowMapDepthBuffer);
         ~DescriptorService();
         VkDescriptorSetLayout DescriptorSetLayout(const std::string& name)const;
         std::vector<VkDescriptorSet> DescriptorSet(const std::string& name,

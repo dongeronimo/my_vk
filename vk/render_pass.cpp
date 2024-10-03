@@ -111,6 +111,10 @@ namespace vk {
             throw std::runtime_error("failed to create fake shadow map render pass!");
         }
 
+        RenderPass* r = new RenderPass(name);
+        r->mRenderPass = fakeShadowMapRenderPass;
+        return r;
+
     }
     RenderPass::RenderPass(VkFormat colorFormat, const std::string& name,
         VkImageLayout finalLayout):mName(name)

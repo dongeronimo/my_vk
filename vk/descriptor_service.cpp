@@ -16,7 +16,7 @@ const uint32_t SAMPLER_POOL_SIZE = 1000;
 namespace vk
 {
     DescriptorService::DescriptorService(SamplerService& samplerService,
-        ImageService& imageService)
+        ImageService& imageService, std::vector<VkImageView> fakeShadowMapColorBuffers, VkImageView fakeShadowMapDepthBuffer)
         :mSamplerService(samplerService)
     {
         mLayouts.insert({ utils::Hash(CAMERA_LAYOUT_NAME), CreateDescriptorSetLayoutForCamera() });
@@ -70,7 +70,7 @@ namespace vk
 
         CreateDescriptorSetLayoutForFakeShadowBuffer();
         CreateDescriptorPoolForFakeShadowBuffer();
-        CreateDescriptorSetForFakeShadowBuffer();
+        CreateDescriptorSetForFakeShadowBuffer(fakeShadowMapColorBuffers, fakeShadowMapDepthBuffer);
     
     }
     DescriptorService::~DescriptorService()

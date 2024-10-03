@@ -67,7 +67,10 @@ int main(int argc, char** argv)
     VkImage fakeShadowMapDepthImage;
     VkImageView fakeShadowMapDepthImageView;
     VkDeviceMemory fakeShadowMapDeviceMemory;
-    vk::ImageService::CreateImage(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, fakeShadowMapDepthImage, fakeShadowMapDeviceMemory);
+    vk::ImageService::CreateImage(SHADOW_MAP_WIDTH, SHADOW_MAP_HEIGHT, VK_FORMAT_D32_SFLOAT, 
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        fakeShadowMapDepthImage, fakeShadowMapDeviceMemory);
     fakeShadowMapDepthImageView = vk::ImageService::CreateImageView(fakeShadowMapDepthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -155,7 +158,7 @@ int main(int argc, char** argv)
     vk::ImageService imageService({"blackBrick.png","brick.png","floor01.jpg"});
     //create the descriptor infrastructure: descriptorSetLayouts, DescriptorPools and DescriptorSets
     vk::DescriptorService descriptorService(samplersService,
-        imageService);
+        imageService, fakeShadowMapImageViews, fakeShadowMapDepthImageView);
     //load meshes
     vk::MeshService meshService({ "monkey.glb", "4x4tile.glb"});
     //create the pipelines
@@ -174,7 +177,7 @@ int main(int argc, char** argv)
     gPipelines.insert({ utils::Hash("fakeShadowMapPipeline"), fakeShadowMapPipeline });
     //register that mainRenderPass has these pipelines
     gRenderPassPipelineTable.insert({ utils::Hash("mainRenderPass"), {utils::Hash("phongSolidColor"),  utils::Hash("demoPipeline")} });
-    gRenderPassPipelineTable.insert({ utils::Hash("shadowMapRenderPass"), {utils::Hash("shadowMapPipeline")} });
+    gRenderPassPipelineTable.insert({ utils::Hash("FakeShadowMapRenderPass"), {utils::Hash("fakeShadowMapPipeline")} });
     //create the synchronization objects
     vk::SyncronizationService syncService;
     //////////////////////GAME OBJECTS//////////////////////
@@ -329,9 +332,11 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
         memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
             })->
         SetDescriptorSetLayouts({ 
-            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
-            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME),
-            descriptorService.DescriptorSetLayout(vk::LIGHTNING_LAYOUT_NAME)})->
+            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),//We need the camera
+            descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME), //and the model matrix
+            descriptorService.DescriptorSetLayout(vk::LIGHTNING_LAYOUT_NAME), //and lightning data
+            descriptorService.DescriptorSetLayout(vk::FAKE_SHADOW_MAP_SAMPLERS) //and the samplers for the 
+            })->
             SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
         SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
