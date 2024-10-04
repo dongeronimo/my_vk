@@ -488,7 +488,7 @@ namespace vk
         directionalLightBinding.binding = 0; // Corresponds to set = 2, binding = 0
         directionalLightBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         directionalLightBinding.descriptorCount = 1;
-        directionalLightBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        directionalLightBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT;
         directionalLightBinding.pImmutableSamplers = nullptr; // Not used for uniform buffers
         //ambient light
         VkDescriptorSetLayoutBinding ambientLightBinding = {};

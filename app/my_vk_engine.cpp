@@ -23,7 +23,7 @@
 #include "utils/concatenate.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <utils/ring_buffer.h>
-
+float orthoSize = 100.0f;
 typedef hash_t renderpass_hash_t;
 typedef hash_t pipeline_hash_t;
 const uint32_t SHADOW_MAP_WIDTH = 512;
@@ -160,13 +160,25 @@ int main(int argc, char** argv)
     vk::DescriptorService descriptorService(samplersService,
         imageService, fakeShadowMapImageViews, fakeShadowMapDepthImageView);
     //load meshes
-    vk::MeshService meshService({ "monkey.glb", "4x4tile.glb"});
+    vk::MeshService meshService({ "monkey.glb", "4x4tile.glb", "box.glb"});
     //create the pipelines
     entities::Pipeline* demoPipeline = CreateDemoPipeline(mainRenderPass, device, descriptorService);
     entities::TLightCallback lightCallback = []() {
-        lights.ambient.colorAndIntensity = { 1,1,1,0.1f };
-        lights.directionalLights.diffuseColorAndIntensity[0] = { 1,1,1,1 };
-        lights.directionalLights.direction[0] = { 0,0,-1 };
+        lights.ambient.colorAndIntensity = { 1,1,1,0.01f };
+        lights.directionalLights.diffuseColorAndIntensity = { 1,1,1,1 };
+        lights.directionalLights.direction = { 0, -1, -1 };
+        ////light matrix calc
+        glm::mat4 projection = glm::ortho(
+            -orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, 200.f);
+        //GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
+        projection[1][1] *= -1;
+        glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction);
+        glm::vec3 originInInf = glm::vec3(0, 0, 100.0f);
+        glm::mat4 viewMatrix = glm::lookAt(originInInf,
+            originInInf + lightDirection,
+            glm::vec3(0, 0, 1));
+        glm::mat4 lightMatrix = projection * viewMatrix;
+        lights.directionalLights.lightMatrix = lightMatrix;
         return lights;
     };
     entities::Pipeline* phongSolidColor = CreatePhongSolidColorPipeline(mainRenderPass, device, descriptorService, lightCallback);  
@@ -176,7 +188,10 @@ int main(int argc, char** argv)
     gPipelines.insert({ utils::Hash("demoPipeline"), demoPipeline });
     gPipelines.insert({ utils::Hash("fakeShadowMapPipeline"), fakeShadowMapPipeline });
     //register that mainRenderPass has these pipelines
-    gRenderPassPipelineTable.insert({ utils::Hash("mainRenderPass"), {utils::Hash("phongSolidColor"),  utils::Hash("demoPipeline")} });
+    gRenderPassPipelineTable.insert({ utils::Hash("mainRenderPass"), {
+        utils::Hash("phongSolidColor") 
+        /*,utils::Hash("demoPipeline")*/
+        } });
     gRenderPassPipelineTable.insert({ utils::Hash("FakeShadowMapRenderPass"), {utils::Hash("fakeShadowMapPipeline")} });
     //create the synchronization objects
     vk::SyncronizationService syncService;
@@ -215,7 +230,7 @@ int main(int argc, char** argv)
         for (auto j = 0; j < 5; j++) {
             auto name = Concatenate("Tile[", i, ",", j, "]");
             auto tile = new entities::GameObject(name, descriptorService, meshService.GetMesh("4x4tile.glb"));
-            tile->SetPosition(glm::vec3{ i * 2, j * 2, 0.0f }+ glm::vec3{-2.5f, -2.5f, -4.0f});
+            tile->SetPosition(glm::vec3{ i * 2, j * 2, 0.0f }+ glm::vec3{0, 0, -4.0f});
             tile->SetOrientation(glm::quat());
             tile->OnDraw = [i, j, &descriptorService](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
                 if (pipeline.Hash() == utils::Hash("phongSolidColor")) {
@@ -241,8 +256,33 @@ int main(int argc, char** argv)
             tiles.push_back(tile);
         }
     }
+    auto gBox = new entities::GameObject("box", descriptorService, meshService.GetMesh("box.glb"));
+    gBox->SetPosition(glm::vec3(3, 3, 0));
+    gBox->SetOrientation(glm::quat());
+    gObjects.push_back(gBar);
+    gBox->OnDraw = [&descriptorService](entities::GameObject& go, entities::Pipeline& pipeline, uint32_t currentFrame, VkCommandBuffer commandBuffer) {
+        if (pipeline.Hash() == utils::Hash("phongSolidColor")) {
+            entities::ColorPushConstantData color{ {0,1,1,1} };
+            pipeline.SetPushConstant<entities::ColorPushConstantData>(
+                color, go.mId, commandBuffer, VK_SHADER_STAGE_VERTEX_BIT
+            );
+            ///use the shadow map samplers
+            std::vector<VkDescriptorSet> samplerDescriptorSetRingBuffer = descriptorService.DescriptorSet(vk::FAKE_SHADOW_MAP_SAMPLERS);
+            vkCmdBindDescriptorSets(
+                commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.PipelineLayout(),
+                vk::FAKE_SHADOW_MAP_OUTPUT_SAMPLERS_SET,
+                1,
+                &samplerDescriptorSetRingBuffer[currentFrame],
+                0,
+                nullptr
+            );
+        }
+    };
+
     std::vector<entities::GameObject*> objectsWithShadowAndLight(tiles);
     objectsWithShadowAndLight.push_back(gFoo);
+    objectsWithShadowAndLight.push_back(gBox);
     //add the game objects to their pipelines
     gPipelineGameObjectTable.insert({ phongSolidColor->Hash(), objectsWithShadowAndLight});
     gPipelineGameObjectTable.insert({ demoPipeline->Hash(), {gBar} });
@@ -384,13 +424,18 @@ entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Devi
         SetColorBlending(entities::GetNoColorBlend())->
         SetViewport(entities::GetViewportForSize(w, h), entities::GetScissor(w, h))->
         SetCameraCallback([](uintptr_t destAddr) {
-            glm::mat4 orthoMatrix = glm::ortho(-SHADOW_MAP_WIDTH/2.0f, SHADOW_MAP_WIDTH/2.0f, SHADOW_MAP_HEIGHT/2.0f, -SHADOW_MAP_HEIGHT/2.0f, 0.01f, 200.f);
-            glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction[0]);
-            glm::vec3 originInInf = lightDirection * -100.f;
-            glm::mat4 viewMatrix = glm::lookAt(originInInf, glm::vec3(0,0,0), glm::vec3(0,0,1));
-
+            ////light matrix calc
+            glm::mat4 projection = glm::ortho(
+                -orthoSize, orthoSize, -orthoSize, orthoSize,1.0f, 200.f);
+            glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction);
+            glm::vec3 originInInf = glm::vec3(0, 0, 100.0f);
+            glm::mat4 viewMatrix = glm::lookAt(originInInf, 
+                originInInf + lightDirection, 
+                glm::vec3(0,0,1));
+            //GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
+            projection[1][1] *= -1;
             entities::CameraUniformBuffer lightAsCamera;
-            lightAsCamera.proj = orthoMatrix;
+            lightAsCamera.proj = projection;
             lightAsCamera.view = viewMatrix;
             lightAsCamera.cameraPos = originInInf;
             void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
