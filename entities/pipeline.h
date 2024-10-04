@@ -14,6 +14,7 @@ namespace vk {
 }
 namespace entities
 {
+    class Pipeline;
     /// <summary>
     /// Holds the data for the color push constant.
     /// </summary>
@@ -45,7 +46,7 @@ namespace entities
         AmbientLightUniformBuffer ambient;
         DirectionalLightUniformBuffer directionalLights;
     };
-    typedef std::function<void(uintptr_t destAddr)> TCameraCallback;
+    typedef std::function<void(uintptr_t destAddr, VkCommandBuffer cmdBuffer, entities::Pipeline& pipeline, std::vector<VkDescriptorSet>& mCameraDescriptorSet, uint32_t currentFrame)> TCameraCallback;
     typedef std::function<LightBuffers()> TLightCallback;
     /// <summary>
     /// Load a shader from the compiled .spv to a shader module

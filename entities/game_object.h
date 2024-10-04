@@ -35,6 +35,9 @@ namespace entities {
         void Draw(VkCommandBuffer cmdBuffer, 
             Pipeline& pipeline,
             uint32_t currentFrame);//TODO staticMeshRenderer: this belongs to StaticMeshRenderer
+    
+        vk::DescriptorService& GetDescriptorService() { return mDescriptorService; }
+
     private:
         void CopyModelMatrixToDescriptorSetMemory(uint32_t currentFrame);//TODO staticRenderMesh: 
         entities::Mesh* mMesh;

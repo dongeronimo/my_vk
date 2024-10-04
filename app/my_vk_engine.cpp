@@ -23,7 +23,7 @@
 #include "utils/concatenate.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <utils/ring_buffer.h>
-float orthoSize = 100.0f;
+float orthoSize = 10.0f;
 typedef hash_t renderpass_hash_t;
 typedef hash_t pipeline_hash_t;
 const uint32_t SHADOW_MAP_WIDTH = 512;
@@ -164,20 +164,24 @@ int main(int argc, char** argv)
     //create the pipelines
     entities::Pipeline* demoPipeline = CreateDemoPipeline(mainRenderPass, device, descriptorService);
     entities::TLightCallback lightCallback = []() {
-        lights.ambient.colorAndIntensity = { 1,1,1,0.01f };
+        lights.ambient.colorAndIntensity = { 1,1,1,0.001f };
         lights.directionalLights.diffuseColorAndIntensity = { 1,1,1,1 };
         lights.directionalLights.direction = { 0, -1, -1 };
+        glm::mat4 projection = glm::perspective(glm::radians(90.f), 1.0f, 0.1f, 100.0f);
+        glm::vec3 lightPos = -lights.directionalLights.direction * 10.0f; // Position the light 10 units away in the direction of the 
+        glm::mat4 view = glm::lookAt(lightPos, glm::vec3(0.0f), {0,0,1});
+        glm::mat4 lightMatrix = projection * view;
         ////light matrix calc
-        glm::mat4 projection = glm::ortho(
+        /*glm::mat4 projection = glm::ortho(
             -orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, 200.f);
-        //GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
-        projection[1][1] *= -1;
-        glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction);
-        glm::vec3 originInInf = glm::vec3(0, 0, 100.0f);
-        glm::mat4 viewMatrix = glm::lookAt(originInInf,
-            originInInf + lightDirection,
-            glm::vec3(0, 0, 1));
-        glm::mat4 lightMatrix = projection * viewMatrix;
+        *///GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
+        //projection[1][1] *= -1;
+        //glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction);
+        //glm::vec3 originInInf = glm::vec3(0, 0, 10.0f);
+        //glm::mat4 viewMatrix = glm::lookAt(originInInf,
+        //    originInInf + lightDirection,
+        //    glm::vec3(0, 0, 1));
+        //glm::mat4 lightMatrix = projection * viewMatrix;
         lights.directionalLights.lightMatrix = lightMatrix;
         return lights;
     };
@@ -364,9 +368,19 @@ entities::Pipeline* CreateDemoPipeline(vk::RenderPass* renderPass, vk::Device& d
             entities::LoadShaderModule(device.GetDevice(), "demo.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "demo.frag.spv")
         )->
-        SetCameraCallback([](uintptr_t destAddr) {
+        SetCameraCallback([](uintptr_t destAddr, VkCommandBuffer cmdBuffer, entities::Pipeline& pipeline, std::vector<VkDescriptorSet>& mCameraDescriptorSet, uint32_t currentFrame) {
             void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
             memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
+            //bind the descriptor sets
+            vkCmdBindDescriptorSets(
+                cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.PipelineLayout(),
+                vk::CAMERA_SET,
+                1,
+                &mCameraDescriptorSet[currentFrame],
+                0,
+                nullptr
+            );
         })->
         SetDescriptorSetLayouts({
             descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
@@ -389,10 +403,20 @@ entities::Pipeline* CreatePhongSolidColorPipeline(vk::RenderPass* renderPass, vk
             entities::LoadShaderModule(device.GetDevice(), "phong_color.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "phong_color.frag.spv")
         )->
-        SetCameraCallback([](uintptr_t destAddr) {
-        void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
-        memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
-            })->
+        SetCameraCallback([](uintptr_t destAddr, VkCommandBuffer cmdBuffer, entities::Pipeline& pipeline, std::vector<VkDescriptorSet>& mCameraDescriptorSet, uint32_t currentFrame) {
+            void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
+            memcpy(cameraDescriptorSetAddr, &cameraBuffer, sizeof(entities::CameraUniformBuffer));
+            //bind the descriptor sets
+            vkCmdBindDescriptorSets(
+                cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.PipelineLayout(),
+                vk::CAMERA_SET,
+                1,
+                &mCameraDescriptorSet[currentFrame],
+                0,
+                nullptr
+            );
+        })->
         SetDescriptorSetLayouts({ 
             descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),//We need the camera
             descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME), //and the model matrix
@@ -416,30 +440,52 @@ entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Devi
             entities::LoadShaderModule(device.GetDevice(), "shadow_map.vert.spv"),
             entities::LoadShaderModule(device.GetDevice(), "shadow_map.frag.spv"))
         ->SetDescriptorSetLayouts({
-            descriptorService.DescriptorSetLayout(vk::CAMERA_LAYOUT_NAME),
+            descriptorService.DescriptorSetLayout(vk::LIGHTNING_LAYOUT_NAME),
             descriptorService.DescriptorSetLayout(vk::MODEL_MATRIX_LAYOUT_NAME)})->
         SetVertexInputStateInfo(entities::GetVertexInputInfoForMesh())->
         SetRasterizerStateInfo(entities::GetBackfaceCullClockwiseRasterizationInfo())->
         SetDepthStencilStateInfo(entities::GetDefaultDepthStencil())->
         SetColorBlending(entities::GetNoColorBlend())->
         SetViewport(entities::GetViewportForSize(w, h), entities::GetScissor(w, h))->
-        SetCameraCallback([](uintptr_t destAddr) {
+        SetCameraCallback([&descriptorService](uintptr_t destAddr, VkCommandBuffer cmdBuffer, entities::Pipeline& pipeline, std::vector<VkDescriptorSet>& mCameraDescriptorSet, uint32_t currentFrame) {
+             
+
+            lights.ambient.colorAndIntensity = { 1,1,1,0.001f };
+            lights.directionalLights.diffuseColorAndIntensity = { 1,1,1,1 };
+            lights.directionalLights.direction = { 0, -1, -1 };
+            glm::mat4 projection = glm::perspective(glm::radians(90.f), 1.0f, 0.1f, 100.0f);
+            glm::vec3 lightPos = -lights.directionalLights.direction * 10.0f; // Position the light 10 units away in the direction of the 
+            glm::mat4 view = glm::lookAt(lightPos, glm::vec3(0.0f), { 0,0,1 });
+            glm::mat4 lightMatrix = projection * view;
             ////light matrix calc
-            glm::mat4 projection = glm::ortho(
-                -orthoSize, orthoSize, -orthoSize, orthoSize,1.0f, 200.f);
-            glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction);
-            glm::vec3 originInInf = glm::vec3(0, 0, 100.0f);
-            glm::mat4 viewMatrix = glm::lookAt(originInInf, 
-                originInInf + lightDirection, 
-                glm::vec3(0,0,1));
-            //GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
-            projection[1][1] *= -1;
-            entities::CameraUniformBuffer lightAsCamera;
-            lightAsCamera.proj = projection;
-            lightAsCamera.view = viewMatrix;
-            lightAsCamera.cameraPos = originInInf;
-            void* cameraDescriptorSetAddr = reinterpret_cast<void*>(destAddr);
-            memcpy(cameraDescriptorSetAddr, &lightAsCamera, sizeof(entities::CameraUniformBuffer));
+            /*glm::mat4 projection = glm::ortho(
+                -orthoSize, orthoSize, -orthoSize, orthoSize, 1.0f, 200.f);
+            *///GOTCHA: GLM is for opengl, the y coords are inverted. With this trick we the correct that
+            //projection[1][1] *= -1;
+            //glm::vec3 lightDirection = glm::normalize(lights.directionalLights.direction);
+            //glm::vec3 originInInf = glm::vec3(0, 0, 10.0f);
+            //glm::mat4 viewMatrix = glm::lookAt(originInInf,
+            //    originInInf + lightDirection,
+            //    glm::vec3(0, 0, 1));
+            //glm::mat4 lightMatrix = projection * viewMatrix;
+            lights.directionalLights.lightMatrix = lightMatrix;
+            
+            //copy the data to the descriptor set
+            uintptr_t ambientAddr = descriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Ambient"), 0)[currentFrame];
+            uintptr_t directionalAddr = descriptorService.DescriptorSetsBuffersAddrs(Concatenate(vk::LIGHTNING_LAYOUT_NAME, "Directional"), 0)[currentFrame];
+            memcpy(reinterpret_cast<void*>(ambientAddr), &lights.ambient, sizeof(entities::AmbientLightUniformBuffer));
+            memcpy(reinterpret_cast<void*>(directionalAddr), &lights.directionalLights, sizeof(entities::DirectionalLightUniformBuffer));
+            VkDescriptorSet descriptorSet = descriptorService.DescriptorSet(vk::LIGHTNING_LAYOUT_NAME)[currentFrame];
+            vkCmdBindDescriptorSets(
+                cmdBuffer,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.PipelineLayout(),
+                0, //zero bc in the shader bound to this pipeline the light data is in set = 0
+                1,
+                &descriptorSet,
+                0,
+                nullptr
+            );
         })->
         Build();
     return p;

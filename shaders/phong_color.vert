@@ -4,6 +4,7 @@ layout(set = 0, binding = 0) uniform CameraUniformBuffer {
     mat4 proj;
     vec3 cameraPos;
 } cameraUniform;
+
 layout(set = 1, binding = 0) uniform ObjectUniformBuffer {
     mat4 model;
 } objectUniform;

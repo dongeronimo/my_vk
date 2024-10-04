@@ -65,20 +65,18 @@ namespace entities
             (*OnDraw)(*this, pipeline, currentFrame, cmdBuffer);
         }
         //apply camera
-        pipeline.mCameraCallback(pipeline.mDescriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0)[currentFrame]);
+        //(uintptr_t destAddr, VkCommandBuffer cmdBuffer, entities::Pipeline& pipeline, std::vector<VkDescriptorSet>& mCameraDescriptorSet, uint32_t currentFrame)
+        pipeline.mCameraCallback(
+            pipeline.mDescriptorService.DescriptorSetsBuffersAddrs(vk::CAMERA_LAYOUT_NAME, 0)[currentFrame],//uintptr_t destAddr
+            cmdBuffer,//VkCommandBuffer cmdBuffer
+            pipeline, // entities::Pipeline& pipeline
+            mCameraDescriptorSet, //std::vector<VkDescriptorSet>& mCameraDescriptorSet
+            currentFrame
+            );
         
         //bind the mesh.
         mMesh->Bind(cmdBuffer);
-        //bind the descriptor sets
-        vkCmdBindDescriptorSets(
-            cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipeline.PipelineLayout(),
-            vk::CAMERA_SET,
-            1,
-            &mCameraDescriptorSet[currentFrame],
-            0,
-            nullptr
-        );
+
         uint32_t modelMatrixDynamicOffset = vk::CalculateDynamicOffset<entities::ModelMatrixUniformBuffer>(currentFrame,
             vk::MAX_NUMBER_OF_OBJECTS, mId);
         vkCmdBindDescriptorSets(
