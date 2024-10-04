@@ -24,13 +24,14 @@ layout (location=5) in vec4 fragPosLightSpace;
 void main(){
     // Transform fragment position to light space
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    float currentDepth = projCoords.z;
     projCoords = projCoords * 0.5 + 0.5; // Transform to [0, 1] range
      // Sample depth from shadow map
     float closestDepth = texture(colorSampler, projCoords.xy).r;
     // Current depth from light's perspective
-    float currentDepth = projCoords.z;
+    
     // Shadow calculation
-    float shadow = currentDepth > closestDepth + 0.005 ? 0.5 : 1.0;// Adding a small bias to prevent shadow acne
+    float shadow = currentDepth > closestDepth + 0.005 ? 0.0 : 1.0;// Adding a small bias to prevent shadow acne
     
     //the ambient component
     vec3 ambient = ambientLight.diffuseColorAndIntensity.rgb * ambientLight.diffuseColorAndIntensity.a;
@@ -45,7 +46,8 @@ void main(){
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
     vec3 specular = spec * directionalLight.diffuseColorAndIntensity.rgb * directionalLight.diffuseColorAndIntensity.a; 
     //combine results
-    vec3 phong = (ambient + diffuse + specular) * shadow;
+    vec3 shadowed = (diffuse + specular) * shadow;
+    vec3 phong = ambient + shadowed;
     outColor = vec4(phong * inColor.rgb, inColor.a);
 
 //    vec4 color = texture(colorSampler, inUV0);

@@ -164,7 +164,7 @@ int main(int argc, char** argv)
     //create the pipelines
     entities::Pipeline* demoPipeline = CreateDemoPipeline(mainRenderPass, device, descriptorService);
     entities::TLightCallback lightCallback = []() {
-        lights.ambient.colorAndIntensity = { 1,1,1,0.001f };
+        lights.ambient.colorAndIntensity = { 1,1,1,0.01f };
         lights.directionalLights.diffuseColorAndIntensity = { 1,1,1,1 };
         lights.directionalLights.direction = { 0, -1, -1 };
         glm::mat4 projection = glm::perspective(glm::radians(90.f), 1.0f, 0.1f, 100.0f);
@@ -450,7 +450,7 @@ entities::Pipeline* CreateShadowMapPipeline(vk::RenderPass* renderPass, vk::Devi
         SetCameraCallback([&descriptorService](uintptr_t destAddr, VkCommandBuffer cmdBuffer, entities::Pipeline& pipeline, std::vector<VkDescriptorSet>& mCameraDescriptorSet, uint32_t currentFrame) {
              
 
-            lights.ambient.colorAndIntensity = { 1,1,1,0.001f };
+            lights.ambient.colorAndIntensity = { 1,1,1,0.01f };
             lights.directionalLights.diffuseColorAndIntensity = { 1,1,1,1 };
             lights.directionalLights.direction = { 0, -1, -1 };
             glm::mat4 projection = glm::perspective(glm::radians(90.f), 1.0f, 0.1f, 100.0f);
